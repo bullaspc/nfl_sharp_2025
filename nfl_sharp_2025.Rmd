@@ -4,7 +4,7 @@ subtitle: "Offense & Defense Tendencies · QB Profiles · Skill Positions"
 date: "`r format(Sys.Date(), '%B %Y')`"
 output:
   html_document:
-    theme: null
+    theme: "bootstrap"
     highlight: null
     self_contained: true
     css: styles.css
@@ -252,7 +252,7 @@ if (!is.null(ftn) && "is_play_action" %in% names(ftn)) {
     filter(!is.na(is_play_action)) |>
     left_join(
       reg |> select(game_id, play_id, epa, posteam),
-      by = c("game_id", "nflverse_play_id" = "play_id")
+      by = c("nflverse_game_id" = "game_id", "nflverse_play_id" = "play_id")
     ) |>
     filter(!is.na(epa), !is.na(posteam)) |>
     group_by(posteam) |>
@@ -603,8 +603,6 @@ if (!is.null(ngs_pass) && nrow(ngs_pass) > 0) {
 ```{r qb-table}
 # ── QB Summary Table ───────────────────────────────────────────────────────────
 qb_table_data <- qb_base |>
-  left_join(teams |> select(team_abbr, team_logo_espn),
-            by = c("team" = "team_abbr")) |>
   arrange(desc(epa_att))
 
 qb_table_data |>
@@ -692,8 +690,7 @@ ggplot(rec_base |> slice_max(targets, n = 40),
 ```{r receivers-epa}
 # ── Top Receivers by EPA/Target ────────────────────────────────────────────────
 top_rec <- rec_base |>
-  slice_max(epa_target, n = 25) |>
-  add_team_colors()
+  slice_max(epa_target, n = 25)
 
 ggplot(top_rec, aes(x = reorder(receiver, epa_target), y = epa_target)) +
   geom_col(aes(fill = team_color), width = 0.75) +
