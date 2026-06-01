@@ -1,0 +1,864 @@
+---
+title: "NFL 2025 Season Analysis"
+subtitle: "Offense & Defense Tendencies · QB Profiles · Skill Positions"
+date: "`r format(Sys.Date(), '%B %Y')`"
+output:
+  html_document:
+    theme: null
+    highlight: null
+    self_contained: true
+    css: styles.css
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: true
+    toc_depth: 2
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo    = FALSE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width  = 12,
+  fig.height = 7,
+  dpi = 150
+)
+
+# ── Packages ──────────────────────────────────────────────────────────────────
+suppressPackageStartupMessages({
+  library(nflreadr)
+  library(nflfastR)
+  library(tidyverse)
+  library(ggrepel)
+  library(gt)
+  library(gtExtras)
+  library(scales)
+  library(glue)
+})
+
+# ── Theme ─────────────────────────────────────────────────────────────────────
+bg      <- "#0d0d0d"
+panel   <- "#141414"
+grid    <- "#1e1e1e"
+text_c  <- "#e8e8e8"
+muted   <- "#666666"
+accent  <- "#00d4ff"
+accent2 <- "#ff6b35"
+green_c <- "#00e676"
+red_c   <- "#ff1744"
+
+theme_sharp <- function(base_size = 11) {
+  theme_minimal(base_size = base_size) +
+  theme(
+    plot.background    = element_rect(fill = bg,    color = NA),
+    panel.background   = element_rect(fill = panel, color = NA),
+    panel.grid.major   = element_line(color = grid, linewidth = 0.4),
+    panel.grid.minor   = element_blank(),
+    axis.text          = element_text(color = muted, size = 8),
+    axis.title         = element_text(color = text_c, size = 9, face = "bold"),
+    plot.title         = element_text(color = text_c, size = 14, face = "bold", margin = margin(b = 4)),
+    plot.subtitle      = element_text(color = muted,  size = 9,  margin = margin(b = 12)),
+    plot.caption       = element_text(color = muted,  size = 7,  hjust = 1),
+    legend.background  = element_rect(fill = panel, color = NA),
+    legend.text        = element_text(color = muted, size = 8),
+    legend.title       = element_text(color = text_c, size = 8),
+    strip.text         = element_text(color = text_c, size = 9, face = "bold"),
+    strip.background   = element_rect(fill = grid, color = NA),
+    plot.margin        = margin(12, 16, 12, 12)
+  )
+}
+
+theme_set(theme_sharp())
+
+# ── Load Data ─────────────────────────────────────────────────────────────────
+message("Loading 2025 play-by-play data...")
+pbp_raw <- load_pbp(2025)
+
+# All plays: regular season + playoffs
+plays <- pbp_raw |>
+  filter(
+    play_type %in% c("pass", "run"),
+    !is.na(epa),
+    !is.na(posteam)
+  )
+
+# NGS data
+ngs_pass <- tryCatch(
+  load_nextgen_stats(seasons = 2025, stat_type = "passing"),
+  error = function(e) NULL
+)
+ngs_rush <- tryCatch(
+  load_nextgen_stats(seasons = 2025, stat_type = "rushing"),
+  error = function(e) NULL
+)
+ngs_rec <- tryCatch(
+  load_nextgen_stats(seasons = 2025, stat_type = "receiving"),
+  error = function(e) NULL
+)
+
+# Player stats
+player_stats <- tryCatch(
+  load_player_stats(seasons = 2025),
+  error = function(e) NULL
+)
+
+# FTN charting (play action, coverage, etc.)
+ftn <- tryCatch(
+  load_ftn_charting(seasons = 2025),
+  error = function(e) NULL
+)
+
+# Team logos/colors
+teams <- load_teams()
+
+# Helper: join team colors
+add_team_colors <- function(df, team_col = "team") {
+  df |> left_join(
+    teams |> select(team_abbr, team_color, team_color2, team_logo_espn),
+    by = setNames("team_abbr", team_col)
+  )
+}
+
+# Reg season only filter
+reg <- plays |> filter(season_type == "REG")
+post <- plays |> filter(season_type == "POST")
+
+message("Data loaded. Building report...")
+```
+
+# Offense Tendencies {.section-header}
+
+```{r offense-epa}
+# ── EPA/play & Success Rate ────────────────────────────────────────────────────
+epa_off <- reg |>
+  group_by(posteam) |>
+  summarise(
+    epa_per_play  = mean(epa),
+    success_rate  = mean(success, na.rm = TRUE),
+    n_plays       = n(),
+    .groups = "drop"
+  ) |>
+  rename(team = posteam) |>
+  add_team_colors()
+
+# Quadrant plot: EPA/play vs Success Rate
+avg_epa <- mean(epa_off$epa_per_play)
+avg_sr  <- mean(epa_off$success_rate)
+
+ggplot(epa_off, aes(x = success_rate, y = epa_per_play)) +
+  geom_hline(yintercept = avg_epa, color = muted, linetype = "dashed", linewidth = 0.4) +
+  geom_vline(xintercept = avg_sr,  color = muted, linetype = "dashed", linewidth = 0.4) +
+  geom_point(aes(color = team_color), size = 4, alpha = 0.9) +
+  scale_color_identity() +
+  geom_label_repel(
+    aes(label = team, fill = team_color, color = team_color2),
+    size = 2.5, fontface = "bold",
+    box.padding = 0.4, max.overlaps = 32,
+    label.size = 0
+  ) +
+  scale_fill_identity() +
+  annotate("text", x = max(epa_off$success_rate) * 0.99, y = max(epa_off$epa_per_play) * 0.97,
+           label = "ELITE OFFENSE", color = green_c, size = 2.8, hjust = 1, fontface = "bold") +
+  annotate("text", x = min(epa_off$success_rate) * 1.01, y = min(epa_off$epa_per_play) * 0.97,
+           label = "REBUILD MODE", color = red_c, size = 2.8, hjust = 0, fontface = "bold") +
+  labs(
+    title    = "Offensive EPA/Play vs. Success Rate — 2025",
+    subtitle = "Regular season only · Dashed lines = league average",
+    x = "Success Rate", y = "EPA / Play",
+    caption  = "Data: nflfastR / nflverse"
+  ) +
+  scale_x_continuous(labels = percent_format(accuracy = 1)) +
+  theme(legend.position = "none")
+```
+
+```{r offense-edpr}
+# ── Early Down Pass Rate ────────────────────────────────────────────────────────
+edpr <- reg |>
+  filter(down %in% c(1, 2)) |>
+  group_by(posteam) |>
+  summarise(
+    EDPR       = mean(pass == 1),
+    edpr_epa   = mean(epa[pass == 1], na.rm = TRUE),
+    n          = n(),
+    .groups    = "drop"
+  ) |>
+  rename(team = posteam) |>
+  add_team_colors() |>
+  arrange(desc(EDPR))
+
+ggplot(edpr, aes(x = reorder(team, EDPR), y = EDPR)) +
+  geom_col(aes(fill = ifelse(EDPR > mean(EDPR), accent, muted)), width = 0.75) +
+  geom_hline(yintercept = mean(edpr$EDPR), color = accent2, linetype = "dashed", linewidth = 0.5) +
+  scale_fill_identity() +
+  coord_flip() +
+  scale_y_continuous(labels = percent_format(accuracy = 1), expand = expansion(mult = c(0, 0.05))) +
+  labs(
+    title    = "Early Down Pass Rate (EDPR) — 2025",
+    subtitle = "Downs 1 & 2 · Orange dashed = league average · Warren Sharp signature metric",
+    x = NULL, y = "Pass Rate on 1st & 2nd Down",
+    caption  = "Data: nflfastR / nflverse"
+  )
+```
+
+```{r offense-down-distance}
+# ── Run/Pass Rate by Down & Distance ──────────────────────────────────────────
+rd_splits <- reg |>
+  filter(down %in% c(1, 2, 3)) |>
+  mutate(
+    ydstogo_bucket = case_when(
+      ydstogo <= 2  ~ "Short\n(1-2 yds)",
+      ydstogo <= 5  ~ "Medium\n(3-5 yds)",
+      ydstogo <= 9  ~ "Standard\n(6-9 yds)",
+      ydstogo <= 14 ~ "Long\n(10-14 yds)",
+      TRUE          ~ "Very Long\n(15+)"
+    ),
+    ydstogo_bucket = factor(ydstogo_bucket, levels = c(
+      "Short\n(1-2 yds)", "Medium\n(3-5 yds)", "Standard\n(6-9 yds)",
+      "Long\n(10-14 yds)", "Very Long\n(15+)"
+    )),
+    down_label = paste0(down, ifelse(down == 1, "st", ifelse(down == 2, "nd", "rd")), " Down")
+  ) |>
+  group_by(down_label, ydstogo_bucket) |>
+  summarise(
+    pass_rate = mean(pass == 1),
+    epa       = mean(epa),
+    n         = n(),
+    .groups   = "drop"
+  )
+
+ggplot(rd_splits, aes(x = ydstogo_bucket, y = pass_rate, fill = epa)) +
+  geom_col(width = 0.8) +
+  geom_text(aes(label = percent(pass_rate, accuracy = 1)),
+            vjust = -0.4, color = text_c, size = 2.8, fontface = "bold") +
+  facet_wrap(~down_label) +
+  scale_fill_gradient2(
+    low = red_c, mid = muted, high = green_c, midpoint = 0,
+    name = "EPA/Play"
+  ) +
+  scale_y_continuous(labels = percent_format(accuracy = 1), expand = expansion(mult = c(0, 0.12))) +
+  labs(
+    title    = "League-Wide Pass Rate by Down & Distance — 2025",
+    subtitle = "Color = EPA/play on pass plays · Regular season",
+    x = "Yards to Go", y = "Pass Rate",
+    caption  = "Data: nflfastR / nflverse"
+  )
+```
+
+```{r offense-playaction, eval=!is.null(ftn)}
+# ── Play-Action Usage & EPA ────────────────────────────────────────────────────
+if (!is.null(ftn) && "is_play_action" %in% names(ftn)) {
+  pa_data <- ftn |>
+    filter(!is.na(is_play_action)) |>
+    left_join(
+      reg |> select(game_id, play_id, epa, posteam),
+      by = c("game_id", "nflverse_play_id" = "play_id")
+    ) |>
+    filter(!is.na(epa), !is.na(posteam)) |>
+    group_by(posteam) |>
+    summarise(
+      pa_rate     = mean(is_play_action, na.rm = TRUE),
+      pa_epa      = mean(epa[is_play_action == TRUE], na.rm = TRUE),
+      no_pa_epa   = mean(epa[is_play_action == FALSE], na.rm = TRUE),
+      pa_lift     = pa_epa - no_pa_epa,
+      n           = n(),
+      .groups     = "drop"
+    ) |>
+    rename(team = posteam) |>
+    add_team_colors() |>
+    arrange(desc(pa_rate))
+
+  ggplot(pa_data, aes(x = pa_rate, y = pa_lift)) +
+    geom_hline(yintercept = 0, color = muted, linewidth = 0.4) +
+    geom_vline(xintercept = mean(pa_data$pa_rate), color = muted, linetype = "dashed", linewidth = 0.4) +
+    geom_point(aes(color = team_color), size = 4) +
+    scale_color_identity() +
+    geom_label_repel(
+      aes(label = team, fill = team_color, color = team_color2),
+      size = 2.5, fontface = "bold", box.padding = 0.4,
+      label.size = 0, max.overlaps = 32
+    ) +
+    scale_fill_identity() +
+    scale_x_continuous(labels = percent_format(accuracy = 1)) +
+    labs(
+      title    = "Play-Action: Usage Rate vs. EPA Lift — 2025",
+      subtitle = "EPA lift = PA EPA minus non-PA EPA · Dashed = avg usage rate",
+      x = "Play-Action Rate", y = "EPA Lift from Play-Action",
+      caption  = "Data: FTN Charting / nflverse"
+    ) +
+    theme(legend.position = "none")
+}
+```
+
+```{r offense-table}
+# ── Offense Summary Table ─────────────────────────────────────────────────────
+off_table <- reg |>
+  group_by(posteam) |>
+  summarise(
+    epa_play    = mean(epa),
+    success_rt  = mean(success, na.rm = TRUE),
+    pass_rate   = mean(pass == 1),
+    avg_air_yds = mean(air_yards, na.rm = TRUE),
+    yac_avg     = mean(yards_after_catch, na.rm = TRUE),
+    n_plays     = n(),
+    .groups     = "drop"
+  ) |>
+  left_join(
+    reg |> filter(down %in% c(1,2)) |>
+      group_by(posteam) |>
+      summarise(edpr = mean(pass == 1), .groups = "drop"),
+    by = "posteam"
+  ) |>
+  rename(team = posteam) |>
+  left_join(teams |> select(team_abbr, team_logo_espn, team_color),
+            by = c("team" = "team_abbr")) |>
+  arrange(desc(epa_play))
+
+off_table |>
+  select(team_logo_espn, team, epa_play, success_rt, edpr, pass_rate, avg_air_yds, yac_avg) |>
+  gt() |>
+  gt_img_rows(columns = team_logo_espn, height = 25) |>
+  fmt_number(columns = c(epa_play, avg_air_yds, yac_avg), decimals = 2) |>
+  fmt_percent(columns = c(success_rt, edpr, pass_rate), decimals = 1) |>
+  cols_label(
+    team_logo_espn = "",
+    team       = "Team",
+    epa_play   = "EPA/Play",
+    success_rt = "Success%",
+    edpr       = "EDPR",
+    pass_rate  = "Pass%",
+    avg_air_yds = "Air Yds",
+    yac_avg    = "YAC"
+  ) |>
+  gt_color_rows(epa_play,   palette = c(red_c, panel, green_c), domain = c(-0.25, 0.25)) |>
+  gt_color_rows(success_rt, palette = c(red_c, panel, green_c), domain = c(0.35, 0.55)) |>
+  gt_color_rows(edpr,       palette = c(red_c, panel, green_c), domain = c(0.45, 0.70)) |>
+  tab_header(title = "2025 Offensive Tendencies — All Teams") |>
+  tab_options(
+    table.background.color        = panel,
+    column_labels.background.color = grid,
+    row.striping.background_color  = bg,
+    table.font.color               = text_c,
+    table.font.size                = px(12),
+    heading.background.color       = bg,
+    heading.title.font.size        = px(14)
+  )
+```
+
+---
+
+# Defense Tendencies {.section-header}
+
+```{r defense-epa}
+# ── Defensive EPA Allowed ──────────────────────────────────────────────────────
+epa_def <- reg |>
+  group_by(defteam) |>
+  summarise(
+    epa_allowed     = mean(epa),
+    success_allowed = mean(success, na.rm = TRUE),
+    pass_epa_all    = mean(epa[pass == 1], na.rm = TRUE),
+    run_epa_all     = mean(epa[rush == 1], na.rm = TRUE),
+    n_plays         = n(),
+    .groups         = "drop"
+  ) |>
+  rename(team = defteam) |>
+  add_team_colors()
+
+avg_epa_d <- mean(epa_def$epa_allowed)
+avg_sr_d  <- mean(epa_def$success_allowed)
+
+ggplot(epa_def, aes(x = success_allowed, y = epa_allowed)) +
+  geom_hline(yintercept = avg_epa_d, color = muted, linetype = "dashed", linewidth = 0.4) +
+  geom_vline(xintercept = avg_sr_d,  color = muted, linetype = "dashed", linewidth = 0.4) +
+  geom_point(aes(color = team_color), size = 4, alpha = 0.9) +
+  scale_color_identity() +
+  geom_label_repel(
+    aes(label = team, fill = team_color, color = team_color2),
+    size = 2.5, fontface = "bold",
+    box.padding = 0.4, max.overlaps = 32, label.size = 0
+  ) +
+  scale_fill_identity() +
+  annotate("text", x = min(epa_def$success_allowed) * 1.01,
+           y = min(epa_def$epa_allowed) * 0.97,
+           label = "ELITE DEFENSE", color = green_c, size = 2.8, hjust = 0, fontface = "bold") +
+  annotate("text", x = max(epa_def$success_allowed) * 0.99,
+           y = max(epa_def$epa_allowed) * 0.97,
+           label = "SIEVE DEFENSE", color = red_c, size = 2.8, hjust = 1, fontface = "bold") +
+  labs(
+    title    = "Defensive EPA Allowed vs. Success Rate Allowed — 2025",
+    subtitle = "Lower = better · Dashed lines = league average · Regular season",
+    x = "Success Rate Allowed", y = "EPA / Play Allowed",
+    caption  = "Data: nflfastR / nflverse"
+  ) +
+  scale_x_continuous(labels = percent_format(accuracy = 1)) +
+  theme(legend.position = "none")
+```
+
+```{r defense-pass-run}
+# ── Pass vs Run Defense Split ──────────────────────────────────────────────────
+def_split <- epa_def |>
+  select(team, team_color, pass_epa_all, run_epa_all) |>
+  pivot_longer(cols = c(pass_epa_all, run_epa_all),
+               names_to = "type", values_to = "epa") |>
+  mutate(type = ifelse(type == "pass_epa_all", "Pass Defense", "Run Defense"))
+
+ggplot(def_split |> arrange(type, epa),
+       aes(x = reorder(team, epa), y = epa, fill = type)) +
+  geom_col(position = "dodge", width = 0.7) +
+  geom_hline(yintercept = 0, color = text_c, linewidth = 0.3) +
+  scale_fill_manual(values = c("Pass Defense" = accent, "Run Defense" = accent2)) +
+  coord_flip() +
+  scale_y_continuous(expand = expansion(mult = c(0.05, 0.05))) +
+  labs(
+    title    = "EPA Allowed: Pass vs. Run Defense — 2025",
+    subtitle = "Lower EPA allowed = better defense · Regular season",
+    x = NULL, y = "EPA / Play Allowed", fill = NULL,
+    caption  = "Data: nflfastR / nflverse"
+  ) +
+  theme(legend.position = "top")
+```
+
+```{r defense-third-down}
+# ── 3rd Down Defense ──────────────────────────────────────────────────────────
+third_def <- reg |>
+  filter(down == 3) |>
+  group_by(defteam) |>
+  summarise(
+    conv_allowed = mean(first_down == 1, na.rm = TRUE),
+    epa_3rd      = mean(epa),
+    n            = n(),
+    .groups      = "drop"
+  ) |>
+  rename(team = defteam) |>
+  add_team_colors() |>
+  arrange(conv_allowed)
+
+ggplot(third_def, aes(x = reorder(team, conv_allowed), y = conv_allowed)) +
+  geom_col(aes(fill = ifelse(conv_allowed < mean(conv_allowed), green_c, red_c)), width = 0.75) +
+  geom_hline(yintercept = mean(third_def$conv_allowed),
+             color = accent2, linetype = "dashed", linewidth = 0.5) +
+  scale_fill_identity() +
+  coord_flip() +
+  scale_y_continuous(labels = percent_format(accuracy = 1),
+                     expand = expansion(mult = c(0, 0.05))) +
+  labs(
+    title    = "3rd Down Conversion Rate Allowed — 2025",
+    subtitle = "Green = better than average · Orange dashed = league average",
+    x = NULL, y = "3rd Down Conversion Rate Allowed",
+    caption  = "Data: nflfastR / nflverse"
+  )
+```
+
+```{r defense-table}
+# ── Defense Summary Table ──────────────────────────────────────────────────────
+def_table <- reg |>
+  group_by(defteam) |>
+  summarise(
+    epa_allowed  = mean(epa),
+    success_all  = mean(success, na.rm = TRUE),
+    pass_epa_all = mean(epa[pass == 1], na.rm = TRUE),
+    run_epa_all  = mean(epa[rush == 1], na.rm = TRUE),
+    .groups      = "drop"
+  ) |>
+  left_join(
+    reg |> filter(down == 3) |>
+      group_by(defteam) |>
+      summarise(third_conv_all = mean(first_down == 1, na.rm = TRUE), .groups = "drop"),
+    by = "defteam"
+  ) |>
+  rename(team = defteam) |>
+  left_join(teams |> select(team_abbr, team_logo_espn),
+            by = c("team" = "team_abbr")) |>
+  arrange(epa_allowed)
+
+def_table |>
+  select(team_logo_espn, team, epa_allowed, success_all, pass_epa_all, run_epa_all, third_conv_all) |>
+  gt() |>
+  gt_img_rows(columns = team_logo_espn, height = 25) |>
+  fmt_number(columns = c(epa_allowed, pass_epa_all, run_epa_all), decimals = 2) |>
+  fmt_percent(columns = c(success_all, third_conv_all), decimals = 1) |>
+  cols_label(
+    team_logo_espn = "",
+    team          = "Team",
+    epa_allowed   = "EPA Allowed",
+    success_all   = "Success% All",
+    pass_epa_all  = "Pass EPA All",
+    run_epa_all   = "Run EPA All",
+    third_conv_all = "3rd Conv All"
+  ) |>
+  gt_color_rows(epa_allowed,   palette = c(green_c, panel, red_c), domain = c(-0.25, 0.25)) |>
+  gt_color_rows(success_all,   palette = c(green_c, panel, red_c), domain = c(0.35, 0.55)) |>
+  gt_color_rows(third_conv_all,palette = c(green_c, panel, red_c), domain = c(0.30, 0.50)) |>
+  tab_header(title = "2025 Defensive Tendencies — All Teams") |>
+  tab_options(
+    table.background.color         = panel,
+    column_labels.background.color = grid,
+    row.striping.background_color  = bg,
+    table.font.color               = text_c,
+    table.font.size                = px(12),
+    heading.background.color       = bg,
+    heading.title.font.size        = px(14)
+  )
+```
+
+---
+
+# QB Profiles {.section-header}
+
+```{r qb-cpoe-epa}
+# ── CPOE vs EPA/Attempt ────────────────────────────────────────────────────────
+qb_base <- reg |>
+  filter(pass == 1, !is.na(passer_id), !is.na(cpoe)) |>
+  group_by(passer_id, passer, posteam) |>
+  summarise(
+    attempts    = n(),
+    cpoe        = mean(cpoe, na.rm = TRUE),
+    epa_att     = mean(epa),
+    air_yds     = mean(air_yards, na.rm = TRUE),
+    .groups     = "drop"
+  ) |>
+  filter(attempts >= 150) |>
+  rename(team = posteam) |>
+  add_team_colors()
+
+avg_cpoe <- mean(qb_base$cpoe)
+avg_epa_att <- mean(qb_base$epa_att)
+
+ggplot(qb_base, aes(x = cpoe, y = epa_att)) +
+  geom_hline(yintercept = avg_epa_att, color = muted, linetype = "dashed", linewidth = 0.4) +
+  geom_vline(xintercept = avg_cpoe,    color = muted, linetype = "dashed", linewidth = 0.4) +
+  geom_point(aes(color = team_color), size = 5, alpha = 0.9) +
+  scale_color_identity() +
+  geom_label_repel(
+    aes(label = passer, fill = team_color, color = team_color2),
+    size = 2.4, fontface = "bold", box.padding = 0.5,
+    label.size = 0, max.overlaps = 32
+  ) +
+  scale_fill_identity() +
+  labs(
+    title    = "QB CPOE vs. EPA/Attempt — 2025",
+    subtitle = "Min 150 attempts · CPOE = completion % over expected · Dashed = averages",
+    x = "CPOE (%)", y = "EPA / Attempt",
+    caption  = "Data: nflfastR / nflverse"
+  ) +
+  annotate("text", x = max(qb_base$cpoe) * 0.97, y = max(qb_base$epa_att) * 0.96,
+           label = "ELITE", color = green_c, size = 3, fontface = "bold", hjust = 1) +
+  theme(legend.position = "none")
+```
+
+```{r qb-air-yards}
+# ── Air Yards (Aggressiveness) ─────────────────────────────────────────────────
+ggplot(qb_base |> arrange(desc(air_yds)),
+       aes(x = reorder(passer, air_yds), y = air_yds)) +
+  geom_col(aes(fill = ifelse(air_yds > mean(air_yds), accent, muted)), width = 0.75) +
+  geom_hline(yintercept = mean(qb_base$air_yds), color = accent2,
+             linetype = "dashed", linewidth = 0.5) +
+  scale_fill_identity() +
+  coord_flip() +
+  labs(
+    title    = "Average Air Yards per Attempt — 2025",
+    subtitle = "Proxy for QB aggressiveness / depth of target · Min 150 attempts",
+    x = NULL, y = "Avg Air Yards",
+    caption  = "Data: nflfastR / nflverse"
+  )
+```
+
+```{r qb-ngs, eval=!is.null(ngs_pass)}
+# ── NGS: Time to Throw + Aggressiveness ───────────────────────────────────────
+if (!is.null(ngs_pass) && nrow(ngs_pass) > 0) {
+  ngs_season <- ngs_pass |>
+    filter(!is.na(avg_time_to_throw), !is.na(aggressiveness)) |>
+    group_by(player_display_name, player_gsis_id, team_abbr) |>
+    summarise(
+      avg_ttt     = mean(avg_time_to_throw, na.rm = TRUE),
+      aggression  = mean(aggressiveness, na.rm = TRUE),
+      avg_air_yds = mean(avg_intended_air_yards, na.rm = TRUE),
+      .groups     = "drop"
+    ) |>
+    semi_join(qb_base, by = c("player_gsis_id" = "passer_id")) |>
+    rename(team = team_abbr) |>
+    add_team_colors()
+
+  if (nrow(ngs_season) >= 5) {
+    ggplot(ngs_season, aes(x = avg_ttt, y = aggression)) +
+      geom_point(aes(color = team_color), size = 5) +
+      scale_color_identity() +
+      geom_label_repel(
+        aes(label = player_display_name, fill = team_color, color = team_color2),
+        size = 2.4, fontface = "bold", box.padding = 0.4, label.size = 0
+      ) +
+      scale_fill_identity() +
+      labs(
+        title    = "NGS: Time to Throw vs. Aggressiveness% — 2025",
+        subtitle = "Aggressiveness = % of passes into tight coverage · Source: Next Gen Stats",
+        x = "Avg Time to Throw (sec)", y = "Aggressiveness %",
+        caption  = "Data: NFL Next Gen Stats via nflverse"
+      ) +
+      scale_y_continuous(labels = percent_format(accuracy = 1, scale = 1)) +
+      theme(legend.position = "none")
+  }
+}
+```
+
+```{r qb-table}
+# ── QB Summary Table ───────────────────────────────────────────────────────────
+qb_table_data <- qb_base |>
+  left_join(teams |> select(team_abbr, team_logo_espn),
+            by = c("team" = "team_abbr")) |>
+  arrange(desc(epa_att))
+
+qb_table_data |>
+  select(team_logo_espn, passer, team, attempts, cpoe, epa_att, air_yds) |>
+  gt() |>
+  gt_img_rows(columns = team_logo_espn, height = 25) |>
+  fmt_number(columns = c(cpoe, epa_att, air_yds), decimals = 2) |>
+  fmt_number(columns = attempts, decimals = 0) |>
+  cols_label(
+    team_logo_espn = "",
+    passer    = "QB",
+    team      = "Team",
+    attempts  = "Att",
+    cpoe      = "CPOE",
+    epa_att   = "EPA/Att",
+    air_yds   = "Air Yds"
+  ) |>
+  gt_color_rows(cpoe,    palette = c(red_c, panel, green_c), domain = c(-10, 10)) |>
+  gt_color_rows(epa_att, palette = c(red_c, panel, green_c), domain = c(-0.3, 0.4)) |>
+  tab_header(title = "2025 QB Profiles — Qualified Passers (150+ Att)") |>
+  tab_options(
+    table.background.color         = panel,
+    column_labels.background.color = grid,
+    row.striping.background_color  = bg,
+    table.font.color               = text_c,
+    table.font.size                = px(12),
+    heading.background.color       = bg,
+    heading.title.font.size        = px(14)
+  )
+```
+
+---
+
+# Skill Positions {.section-header}
+
+```{r receivers-targets}
+# ── Receiver Target Share & YAC ────────────────────────────────────────────────
+rec_base <- reg |>
+  filter(pass == 1, !is.na(receiver_id), !is.na(receiver)) |>
+  group_by(receiver_id, receiver, posteam) |>
+  summarise(
+    targets    = n(),
+    catches    = sum(complete_pass, na.rm = TRUE),
+    catch_pct  = mean(complete_pass, na.rm = TRUE),
+    yac        = mean(yards_after_catch, na.rm = TRUE),
+    air_yds    = mean(air_yards, na.rm = TRUE),
+    epa_target = mean(epa),
+    cpoe_avg   = mean(cpoe, na.rm = TRUE),
+    .groups    = "drop"
+  ) |>
+  filter(targets >= 50) |>
+  rename(team = posteam) |>
+  add_team_colors()
+
+# Team target totals for share calc
+team_targets <- reg |>
+  filter(pass == 1, !is.na(posteam)) |>
+  count(posteam, name = "team_total_targets")
+
+rec_base <- rec_base |>
+  left_join(team_targets, by = c("team" = "posteam")) |>
+  mutate(target_share = targets / team_total_targets)
+
+# Top receivers by EPA/target
+ggplot(rec_base |> slice_max(targets, n = 40),
+       aes(x = air_yds, y = yac)) +
+  geom_point(aes(color = team_color, size = target_share), alpha = 0.85) +
+  scale_color_identity() +
+  scale_size_continuous(range = c(2, 8), labels = percent_format(accuracy = 1),
+                        name = "Target Share") +
+  geom_label_repel(
+    aes(label = receiver, fill = team_color, color = team_color2),
+    size = 2.2, fontface = "bold", box.padding = 0.3,
+    label.size = 0, max.overlaps = 25
+  ) +
+  scale_fill_identity() +
+  labs(
+    title    = "Air Yards vs. YAC — Top Receivers 2025",
+    subtitle = "Bubble size = target share · Top 40 by targets · Min 50 targets",
+    x = "Avg Air Yards (Depth of Target)", y = "Avg YAC",
+    caption  = "Data: nflfastR / nflverse"
+  )
+```
+
+```{r receivers-epa}
+# ── Top Receivers by EPA/Target ────────────────────────────────────────────────
+top_rec <- rec_base |>
+  slice_max(epa_target, n = 25) |>
+  add_team_colors()
+
+ggplot(top_rec, aes(x = reorder(receiver, epa_target), y = epa_target)) +
+  geom_col(aes(fill = team_color), width = 0.75) +
+  scale_fill_identity() +
+  geom_text(aes(label = round(epa_target, 2)),
+            hjust = -0.15, color = text_c, size = 2.8) +
+  coord_flip() +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.15))) +
+  labs(
+    title    = "Top 25 Receivers by EPA/Target — 2025",
+    subtitle = "Min 50 targets · Regular season",
+    x = NULL, y = "EPA / Target",
+    caption  = "Data: nflfastR / nflverse"
+  )
+```
+
+```{r rushers}
+# ── Top Rushers by EPA/Carry ───────────────────────────────────────────────────
+rush_base <- reg |>
+  filter(rush == 1, !is.na(rusher_id), !is.na(rusher)) |>
+  group_by(rusher_id, rusher, posteam) |>
+  summarise(
+    carries    = n(),
+    epa_carry  = mean(epa),
+    success_rt = mean(success, na.rm = TRUE),
+    ypc        = mean(yards_gained, na.rm = TRUE),
+    .groups    = "drop"
+  ) |>
+  filter(carries >= 60) |>
+  rename(team = posteam) |>
+  add_team_colors()
+
+ggplot(rush_base, aes(x = ypc, y = epa_carry)) +
+  geom_hline(yintercept = 0, color = muted, linewidth = 0.3) +
+  geom_vline(xintercept = mean(rush_base$ypc), color = muted,
+             linetype = "dashed", linewidth = 0.4) +
+  geom_point(aes(color = team_color, size = carries), alpha = 0.85) +
+  scale_color_identity() +
+  scale_size_continuous(range = c(2, 8), name = "Carries") +
+  geom_label_repel(
+    aes(label = rusher, fill = team_color, color = team_color2),
+    size = 2.2, fontface = "bold", box.padding = 0.4,
+    label.size = 0, max.overlaps = 30
+  ) +
+  scale_fill_identity() +
+  labs(
+    title    = "Rushing: YPC vs. EPA/Carry — 2025",
+    subtitle = "Min 60 carries · Bubble size = carry volume",
+    x = "Yards Per Carry", y = "EPA / Carry",
+    caption  = "Data: nflfastR / nflverse"
+  )
+```
+
+```{r ngs-receivers, eval=!is.null(ngs_rec)}
+# ── NGS Receiving: Separation & Cushion ───────────────────────────────────────
+if (!is.null(ngs_rec) && nrow(ngs_rec) > 0 &&
+    "avg_separation" %in% names(ngs_rec)) {
+  ngs_rec_season <- ngs_rec |>
+    filter(!is.na(avg_separation)) |>
+    group_by(player_display_name, player_gsis_id, team_abbr) |>
+    summarise(
+      sep         = mean(avg_separation, na.rm = TRUE),
+      cushion     = mean(avg_cushion, na.rm = TRUE),
+      catch_pct   = mean(catch_percentage, na.rm = TRUE),
+      .groups     = "drop"
+    ) |>
+    semi_join(rec_base, by = c("player_gsis_id" = "receiver_id")) |>
+    rename(team = team_abbr) |>
+    add_team_colors()
+
+  if (nrow(ngs_rec_season) >= 5) {
+    ggplot(ngs_rec_season, aes(x = cushion, y = sep)) +
+      geom_point(aes(color = team_color), size = 4, alpha = 0.85) +
+      scale_color_identity() +
+      geom_label_repel(
+        aes(label = player_display_name, fill = team_color, color = team_color2),
+        size = 2.2, fontface = "bold", box.padding = 0.4, label.size = 0
+      ) +
+      scale_fill_identity() +
+      labs(
+        title    = "NGS: Pre-Snap Cushion vs. Separation at Catch — 2025",
+        subtitle = "Source: NFL Next Gen Stats · Qualified receivers (50+ targets)",
+        x = "Avg Pre-Snap Cushion (yds)", y = "Avg Separation at Catch (yds)",
+        caption  = "Data: NFL Next Gen Stats via nflverse"
+      ) +
+      theme(legend.position = "none")
+  }
+}
+```
+
+---
+
+# Team Summary Reports {.section-header}
+
+```{r team-summaries, results='asis', fig.height=5}
+# ── Per-Team Sharp-Style Summary ──────────────────────────────────────────────
+all_teams <- sort(unique(reg$posteam))
+
+for (tm in all_teams) {
+
+  cat(glue("\n\n## {tm}\n\n"))
+
+  # Team data
+  tm_off <- reg |> filter(posteam == tm)
+  tm_def <- reg |> filter(defteam == tm)
+  tm_info <- teams |> filter(team_abbr == tm)
+
+  off_epa  <- mean(tm_off$epa, na.rm = TRUE)
+  def_epa  <- mean(tm_def$epa, na.rm = TRUE)
+  edpr_tm  <- mean(tm_off$pass[tm_off$down %in% c(1,2)] == 1, na.rm = TRUE)
+  sr_off   <- mean(tm_off$success, na.rm = TRUE)
+  sr_def   <- mean(tm_def$success, na.rm = TRUE)
+  pass_rt  <- mean(tm_off$pass == 1, na.rm = TRUE)
+  rush_rt  <- 1 - pass_rt
+  third_off <- mean(tm_off$first_down[tm_off$down == 3] == 1, na.rm = TRUE)
+  third_def <- mean(tm_def$first_down[tm_def$down == 3] == 1, na.rm = TRUE)
+
+  # League ranks
+  rank_off <- rank(-epa_off$epa_per_play)[epa_off$team == tm]
+  rank_def <- rank(epa_def$epa_allowed)[epa_def$team == tm]
+
+  # Down & distance pass rate
+  dd <- tm_off |>
+    filter(down %in% c(1, 2, 3)) |>
+    mutate(
+      bucket = case_when(
+        ydstogo <= 3  ~ "Short",
+        ydstogo <= 7  ~ "Medium",
+        ydstogo <= 11 ~ "Standard",
+        TRUE          ~ "Long"
+      ),
+      bucket = factor(bucket, levels = c("Short","Medium","Standard","Long")),
+      down_label = paste0(down, c("st","nd","rd")[pmin(down,3)], " Down")
+    ) |>
+    group_by(down_label, bucket) |>
+    summarise(pass_rate = mean(pass == 1), n = n(), .groups = "drop")
+
+  p <- ggplot(dd, aes(x = bucket, y = pass_rate, fill = pass_rate)) +
+    geom_col(width = 0.8) +
+    geom_text(aes(label = percent(pass_rate, accuracy = 1)),
+              vjust = -0.3, size = 2.8, color = text_c, fontface = "bold") +
+    facet_wrap(~down_label, nrow = 1) +
+    scale_fill_gradient2(low = accent2, mid = muted, high = accent,
+                         midpoint = 0.5, guide = "none") +
+    scale_y_continuous(labels = percent_format(accuracy = 1),
+                       expand = expansion(mult = c(0, 0.18))) +
+    labs(
+      title    = glue("{tm} — Pass Rate by Down & Distance"),
+      subtitle = glue(
+        "Off EPA/play: {round(off_epa,3)} (Rank #{rank_off})  |  ",
+        "Def EPA allowed: {round(def_epa,3)} (Rank #{rank_def})  |  ",
+        "EDPR: {percent(edpr_tm, accuracy=1)}  |  ",
+        "Off SR: {percent(sr_off, accuracy=1)}  |  ",
+        "3rd Conv: {percent(third_off, accuracy=1)}"
+      ),
+      x = "Distance to Go", y = "Pass Rate",
+      caption = "Data: nflfastR / nflverse"
+    ) +
+    theme_sharp(base_size = 10)
+
+  print(p)
+  cat("\n\n")
+}
+```
+
+---
+
+*Report generated `r format(Sys.time(), '%Y-%m-%d %H:%M')` · Data: nflfastR / nflreadr / nflverse · NGS: NFL Next Gen Stats*

@@ -1,0 +1,199 @@
+/* ── Google Fonts ─────────────────────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;600;700&display=swap');
+
+/* ── Root Variables ───────────────────────────────────────────────────────── */
+:root {
+  --bg:       #0d0d0d;
+  --panel:    #141414;
+  --grid:     #1e1e1e;
+  --border:   #2a2a2a;
+  --text:     #e8e8e8;
+  --muted:    #666666;
+  --accent:   #00d4ff;
+  --accent2:  #ff6b35;
+  --green:    #00e676;
+  --red:      #ff1744;
+}
+
+/* ── Base ─────────────────────────────────────────────────────────────────── */
+* { box-sizing: border-box; }
+
+body {
+  background:  var(--bg);
+  color:       var(--text);
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-size:   14px;
+  line-height: 1.65;
+  margin:      0;
+}
+
+/* ── Main content area ────────────────────────────────────────────────────── */
+.main-container {
+  max-width: 1200px;
+  margin:    0 auto;
+  padding:   0 24px 60px;
+}
+
+/* ── Header / Title block ─────────────────────────────────────────────────── */
+.title-block {
+  padding:          48px 0 32px;
+  border-bottom:    2px solid var(--accent);
+  margin-bottom:    40px;
+}
+
+h1.title {
+  font-family:  'Bebas Neue', sans-serif;
+  font-size:    clamp(40px, 6vw, 72px);
+  letter-spacing: 3px;
+  color:        var(--text);
+  margin:       0 0 6px;
+  line-height:  1;
+}
+
+h3.subtitle {
+  font-family:  'IBM Plex Mono', monospace;
+  font-size:    12px;
+  color:        var(--accent);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin:       0 0 12px;
+  font-weight:  400;
+}
+
+h4.date {
+  font-family:  'IBM Plex Mono', monospace;
+  font-size:    11px;
+  color:        var(--muted);
+  letter-spacing: 1px;
+  margin:       0;
+}
+
+/* ── Section headings ─────────────────────────────────────────────────────── */
+h1 {
+  font-family:    'Bebas Neue', sans-serif;
+  font-size:      42px;
+  letter-spacing: 2px;
+  color:          var(--text);
+  border-bottom:  1px solid var(--border);
+  padding-bottom: 8px;
+  margin-top:     52px;
+  margin-bottom:  28px;
+}
+
+h2 {
+  font-family:    'IBM Plex Sans', sans-serif;
+  font-size:      18px;
+  font-weight:    700;
+  color:          var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  border-left:    3px solid var(--accent);
+  padding-left:   12px;
+  margin-top:     44px;
+  margin-bottom:  20px;
+}
+
+h3 {
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-size:   14px;
+  font-weight: 600;
+  color:       var(--text);
+  margin-top:  28px;
+}
+
+/* ── TOC Sidebar ──────────────────────────────────────────────────────────── */
+#TOC {
+  background:   var(--panel);
+  border-right: 1px solid var(--border);
+  padding:      24px 16px;
+}
+
+#TOC ul {
+  list-style: none;
+  padding:    0;
+  margin:     0;
+}
+
+#TOC li { margin: 2px 0; }
+
+#TOC a {
+  color:           var(--muted);
+  text-decoration: none;
+  font-size:       12px;
+  font-family:     'IBM Plex Mono', monospace;
+  transition:      color 0.15s;
+  display:         block;
+  padding:         3px 0;
+}
+
+#TOC a:hover,
+#TOC .active > a {
+  color: var(--accent);
+}
+
+#TOC .tocify-header { font-weight: 600; }
+#TOC .tocify-subheader { padding-left: 12px; }
+
+/* ── Plots ────────────────────────────────────────────────────────────────── */
+img {
+  max-width:     100%;
+  border-radius: 4px;
+  display:       block;
+  margin:        12px 0;
+}
+
+/* ── gt Tables ────────────────────────────────────────────────────────────── */
+.gt_table {
+  width:         100% !important;
+  border-radius: 4px;
+  overflow:      hidden;
+  margin:        20px 0 32px !important;
+}
+
+/* ── Code blocks ──────────────────────────────────────────────────────────── */
+code, pre {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size:   12px;
+  background:  var(--panel);
+  color:       var(--accent);
+  border:      1px solid var(--border);
+  border-radius: 3px;
+  padding:     2px 5px;
+}
+
+pre {
+  padding: 14px;
+  overflow-x: auto;
+}
+
+/* ── HR dividers ──────────────────────────────────────────────────────────── */
+hr {
+  border:        none;
+  border-top:    1px solid var(--border);
+  margin:        48px 0;
+}
+
+/* ── Italic / caption text ────────────────────────────────────────────────── */
+em, .caption {
+  color:     var(--muted);
+  font-size: 12px;
+}
+
+/* ── Footer ───────────────────────────────────────────────────────────────── */
+p:last-child em {
+  display:         block;
+  margin-top:      40px;
+  padding-top:     16px;
+  border-top:      1px solid var(--border);
+  color:           var(--muted);
+  font-size:       11px;
+  font-style:      normal;
+  font-family:     'IBM Plex Mono', monospace;
+  letter-spacing:  0.5px;
+}
+
+/* ── Responsive ───────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  h1.title  { font-size: 36px; }
+  h1        { font-size: 28px; }
+}
