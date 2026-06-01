@@ -118,6 +118,25 @@ draft_2025 <- tryCatch(
   error = function(e) NULL
 )
 
+# Trades & free agent signings
+trades <- tryCatch(
+  read_csv("data/trades.csv", show_col_types = FALSE) |>
+    mutate(
+      to_team   = clean_team_abbrs(to_team),
+      from_team = clean_team_abbrs(from_team)
+    ),
+  error = function(e) NULL
+)
+
+free_agents <- tryCatch(
+  read_csv("data/free_agents.csv", show_col_types = FALSE) |>
+    mutate(
+      to_team   = clean_team_abbrs(to_team),
+      from_team = clean_team_abbrs(from_team)
+    ),
+  error = function(e) NULL
+)
+
 # Team logos/colors
 teams <- load_teams()
 
