@@ -109,6 +109,15 @@ ftn <- tryCatch(
   error = function(e) NULL
 )
 
+# 2025 Draft picks
+draft_2025 <- tryCatch(
+  load_draft_picks(seasons = 2026) |>
+    mutate(team = clean_team_abbrs(team)) |>
+    select(team, round, pick, position, full_name = pfr_player_name) |>
+    filter(!is.na(full_name)),
+  error = function(e) NULL
+)
+
 # Team logos/colors
 teams <- load_teams()
 
@@ -852,6 +861,33 @@ for (tm in all_teams) {
     theme_sharp(base_size = 10)
 
   print(p)
+
+  # Draft picks table
+  if (!is.null(draft_2025)) {
+    tm_draft <- draft_2025 |> filter(team == tm)
+    if (nrow(tm_draft) > 0) {
+      cat("\n\n**2025 Draft Class**\n\n")
+      tbl <- tm_draft |>
+        gt() |>
+        cols_label(round = "Rd", pick = "Pick", position = "Pos", full_name = "Player") |>
+        cols_align(align = "center", columns = c(round, pick, position)) |>
+        cols_align(align = "left",   columns = full_name) |>
+        gt_color_rows(round,
+          palette = c(accent, panel, muted),
+          domain  = c(1, 7)
+        ) |>
+        tab_options(
+          table.background.color         = panel,
+          column_labels.background.color = grid,
+          row.striping.background_color  = bg,
+          table.font.color               = text_c,
+          table.font.size                = px(11),
+          table.width                    = pct(60)
+        )
+      print(tbl)
+    }
+  }
+
   cat("\n\n")
 }
 ```
