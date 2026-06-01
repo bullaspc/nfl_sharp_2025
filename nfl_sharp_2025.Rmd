@@ -907,6 +907,130 @@ for (tm in all_teams) {
     }
   }
 
+  # Trades table
+  if (!is.null(trades)) {
+    tm_trades <- trades |> filter(to_team == tm | from_team == tm)
+    if (nrow(tm_trades) > 0) {
+      cat("\n\n**Trades**\n\n")
+      hide_receiving <- all(is.na(tm_trades$targets))
+      hide_rushing   <- all(is.na(tm_trades$carries))
+      tbl <- tm_trades |>
+        mutate(direction = if_else(to_team == tm, "IN", "OUT")) |>
+        select(direction, player, position, age, from_team, to_team,
+               draft_comp, off_snap_pct, route_participation,
+               targets, receptions, rec_yards, rec_tds,
+               carries, rush_yards, rush_tds) |>
+        gt() |>
+        cols_label(
+          direction          = "",
+          player             = "Player",
+          position           = "Pos",
+          age                = "Age",
+          from_team          = "From",
+          to_team            = "To",
+          draft_comp         = "Draft Comp",
+          off_snap_pct       = "Snap%",
+          route_participation = "Route%",
+          targets            = "Tgt",
+          receptions         = "Rec",
+          rec_yards          = "RecYds",
+          rec_tds            = "RecTD",
+          carries            = "Car",
+          rush_yards         = "RuYds",
+          rush_tds           = "RuTD"
+        ) |>
+        cols_align(align = "center",
+                   columns = c(direction, position, age, from_team, to_team,
+                                off_snap_pct, route_participation,
+                                targets, receptions, rec_yards, rec_tds,
+                                carries, rush_yards, rush_tds)) |>
+        cols_align(align = "left", columns = c(player, draft_comp)) |>
+        fmt_missing(columns = everything(), missing_text = "—") |>
+        gt_color_rows(off_snap_pct,
+          palette = c(muted, accent),
+          domain  = c(0, 100)
+        ) |>
+        tab_style(
+          style = cell_text(color = green_c, weight = "bold"),
+          locations = cells_body(columns = direction, rows = direction == "IN")
+        ) |>
+        tab_style(
+          style = cell_text(color = red_c, weight = "bold"),
+          locations = cells_body(columns = direction, rows = direction == "OUT")
+        ) |>
+        tab_options(
+          table.background.color         = panel,
+          column_labels.background.color = grid,
+          row.striping.background_color  = bg,
+          table.font.color               = text_c,
+          table.font.size                = px(11),
+          table.width                    = pct(85)
+        )
+      if (hide_receiving) tbl <- tbl |> cols_hide(c(route_participation, targets, receptions, rec_yards, rec_tds))
+      if (hide_rushing)   tbl <- tbl |> cols_hide(c(carries, rush_yards, rush_tds))
+      print(tbl)
+    }
+  }
+
+  # Free Agents table
+  if (!is.null(free_agents)) {
+    tm_fa <- free_agents |> filter(to_team == tm)
+    if (nrow(tm_fa) > 0) {
+      cat("\n\n**Free Agent Signings**\n\n")
+      hide_receiving <- all(is.na(tm_fa$targets))
+      hide_rushing   <- all(is.na(tm_fa$carries))
+      tbl <- tm_fa |>
+        select(player, position, age, from_team,
+               contract_years, contract_aav, contract_total,
+               off_snap_pct, route_participation,
+               targets, receptions, rec_yards, rec_tds,
+               carries, rush_yards, rush_tds) |>
+        gt() |>
+        cols_label(
+          player              = "Player",
+          position            = "Pos",
+          age                 = "Age",
+          from_team           = "From",
+          contract_years      = "Yrs",
+          contract_aav        = "AAV ($M)",
+          contract_total      = "Total ($M)",
+          off_snap_pct        = "Snap%",
+          route_participation = "Route%",
+          targets             = "Tgt",
+          receptions          = "Rec",
+          rec_yards           = "RecYds",
+          rec_tds             = "RecTD",
+          carries             = "Car",
+          rush_yards          = "RuYds",
+          rush_tds            = "RuTD"
+        ) |>
+        cols_align(align = "center",
+                   columns = c(position, age, from_team, contract_years,
+                                contract_aav, contract_total, off_snap_pct,
+                                route_participation, targets, receptions,
+                                rec_yards, rec_tds, carries, rush_yards, rush_tds)) |>
+        cols_align(align = "left", columns = player) |>
+        fmt_missing(columns = everything(), missing_text = "—") |>
+        fmt_currency(columns = c(contract_aav, contract_total),
+                     currency = "USD", decimals = 1, suffixing = FALSE) |>
+        gt_color_rows(off_snap_pct,
+          palette = c(muted, accent),
+          domain  = c(0, 100)
+        ) |>
+        tab_options(
+          table.background.color         = panel,
+          column_labels.background.color = grid,
+          row.striping.background_color  = bg,
+          table.font.color               = text_c,
+          table.font.size                = px(11),
+          table.width                    = pct(85)
+        )
+      if (hide_receiving) tbl <- tbl |> cols_hide(c(route_participation, targets, receptions, rec_yards, rec_tds))
+      if (hide_rushing)   tbl <- tbl |> cols_hide(c(carries, rush_yards, rush_tds))
+      print(tbl)
+    }
+  }
+
   cat("\n\n")
 }
 ```
