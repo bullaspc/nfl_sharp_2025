@@ -25,17 +25,17 @@ knitr::opts_chunk$set(
   dpi = 150
 )
 
-theme_set(theme_sharp(colors = palette_dark))
+theme_set(theme_sharp(colors = palette_light))
 
-bg      <- palette_dark$bg
-panel   <- palette_dark$panel
-grid    <- palette_dark$grid
-text_c  <- palette_dark$text
-muted   <- palette_dark$muted
-accent  <- palette_dark$accent
-accent2 <- palette_dark$accent2
-green_c <- palette_dark$green
-red_c   <- palette_dark$red
+bg      <- palette_light$bg
+panel   <- palette_light$panel
+grid    <- palette_light$grid
+text_c  <- palette_light$text
+muted   <- palette_light$muted
+accent  <- palette_light$accent
+accent2 <- palette_light$accent2
+green_c <- palette_light$green
+red_c   <- palette_light$red
 ```
 
 # Team Pages {.section-header}

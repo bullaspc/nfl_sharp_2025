@@ -40,15 +40,41 @@ install_if_missing <- function(pkg) {
 invisible(lapply(pkgs, install_if_missing))
 cat("All packages ready.\n\n")
 
-# ── 2. Render the report ──────────────────────────────────────────────────────
-cat("Rendering NFL Sharp 2025 report...\n")
+# ── 2. Load shared data once ─────────────────────────────────────────────────
+cat("Loading shared data...\n")
 cat("This will download ~2025 season play-by-play data on first run (~150MB).\n\n")
 
+report_env <- new.env(parent = globalenv())
+source("_common.R", local = report_env)
+
+# ── 3. Render the league page + one page per team into docs/ ────────────────
+dir.create("docs/teams", recursive = TRUE, showWarnings = FALSE)
+
+cat("\nRendering league overview...\n")
 rmarkdown::render(
-  input       = "nfl_sharp_2025.Rmd",
-  output_file = "output/nfl_sharp_2025.html",
-  envir       = new.env(parent = globalenv()),
+  input       = "nfl_sharp_league.Rmd",
+  output_file = "index.html",
+  output_dir  = "docs",
+  envir       = report_env,
   quiet       = FALSE
 )
 
-cat("\n✅ Report rendered: output/nfl_sharp_2025.html\n")
+all_teams <- report_env$all_teams
+cat(glue::glue("\nRendering {length(all_teams)} team pages...\n\n"))
+
+for (i in seq_along(all_teams)) {
+  tm <- all_teams[i]
+  cat(glue::glue("[{i}/{length(all_teams)}] Rendering {tm}...\n"))
+  rmarkdown::render(
+    input       = "nfl_sharp_team.Rmd",
+    output_file = paste0(tm, ".html"),
+    output_dir  = "docs/teams",
+    envir       = report_env,
+    params      = list(team = tm),
+    quiet       = TRUE
+  )
+}
+
+cat(glue::glue(
+  "\n✅ Report rendered: docs/index.html + {length(all_teams)} team pages under docs/teams/\n"
+))
