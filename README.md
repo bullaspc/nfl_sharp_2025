@@ -82,11 +82,11 @@ gh workflow run render-site --repo bullaspc/nfl_sharp_2025
 ```
 nfl_sharp_2025/
 ├── _common.R               # Shared data load, palettes, theme_sharp(), league summaries
-├── nfl_sharp_league.Rmd    # League overview page (dark theme)
+├── nfl_sharp_league.Rmd    # League overview page (light theme)
 ├── nfl_sharp_team.Rmd      # Per-team page template (params$team, light/team-branded theme)
 ├── styles_base.css         # Structural CSS shared by both page types
-├── styles_dark_vars.css    # Dark color variables (league page)
-├── styles_light_vars.css   # Light color variables (team pages)
+├── styles_dark_vars.css    # Dark color variables (unused by current pages, kept available)
+├── styles_light_vars.css   # Light color variables (league + team pages)
 ├── render.R                # Install packages + render league page + 32 team pages
 ├── README.md                # This file
 └── docs/                    # Generated site (GitHub Pages source)
