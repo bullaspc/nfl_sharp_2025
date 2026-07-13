@@ -1,0 +1,45 @@
+name: render-site
+
+on:
+  schedule:
+    - cron: "0 10 * * *"
+  workflow_dispatch:
+  push:
+    branches: [master]
+    paths-ignore:
+      - "docs/**"
+
+permissions:
+  contents: write
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: r-lib/actions/setup-pandoc@v2
+
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: true
+          extra-repositories: "https://nflverse.r-universe.dev"
+
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          cache-version: 1
+
+      - name: Render site
+        run: Rscript render.R
+
+      - name: Commit and push docs if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/
+          if git diff --cached --quiet; then
+            echo "No changes to deploy."
+          else
+            git commit -m "chore: scheduled site render $(date -u +%Y-%m-%d)"
+            git push
+          fi

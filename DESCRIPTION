@@ -1,0 +1,18 @@
+Package: nflsharp
+Type: Package
+Title: NFL Sharp 2025 Static Report
+Version: 1.0.0
+Description: Dependency manifest for the scheduled GitHub Actions render
+    of the NFL Sharp 2025 static site. Not an installable package.
+Encoding: UTF-8
+Imports:
+    nflreadr,
+    nflfastR,
+    tidyverse,
+    ggrepel,
+    gt,
+    gtExtras,
+    scales,
+    glue,
+    rmarkdown,
+    knitr
