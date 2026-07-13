@@ -1,0 +1,326 @@
+---
+title: "`r params$team` — Team Report"
+subtitle: "NFL 2025 Season · Team Summary"
+date: "`r format(Sys.Date(), '%B %Y')`"
+params:
+  team: "KC"
+output:
+  html_document:
+    theme: "bootstrap"
+    highlight: null
+    self_contained: true
+    css: [styles_light_vars.css, styles_base.css]
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: true
+    toc_depth: 2
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo    = FALSE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width  = 12,
+  fig.height = 7,
+  dpi = 150
+)
+
+tm <- params$team
+team_pal <- team_colors_for(tm, teams, base = palette_light)
+theme_set(theme_sharp(colors = team_pal))
+
+bg      <- team_pal$bg
+panel   <- team_pal$panel
+grid    <- team_pal$grid
+text_c  <- team_pal$text
+muted   <- team_pal$muted
+accent  <- team_pal$accent
+accent2 <- team_pal$accent2
+green_c <- team_pal$green
+red_c   <- team_pal$red
+
+tm_info <- teams |> filter(team_abbr == tm)
+```
+
+```{r team-header, echo=FALSE, results='asis'}
+# Team-branded accent override for page chrome (h2, TOC hover, title border)
+cat(glue(
+  '<style>:root {{ --accent: {accent}; --accent2: {accent2}; }}</style>\n'
+))
+cat(glue(
+  '<div class="team-header">',
+  '<img src="{tm_info$team_logo_espn[1]}" alt="{tm}">',
+  '<span class="team-header-name">{tm_info$team_name[1]}</span>',
+  '</div>\n\n'
+))
+cat('[← League Overview](../index.html)\n\n')
+```
+
+```{r team-summary, results='asis', fig.height=5}
+# ── Sharp-Style Team Summary ───────────────────────────────────────────────
+tm_off <- reg |> filter(posteam == tm)
+tm_def <- reg |> filter(defteam == tm)
+
+off_epa  <- mean(tm_off$epa, na.rm = TRUE)
+def_epa  <- mean(tm_def$epa, na.rm = TRUE)
+edpr_tm  <- mean(tm_off$pass[tm_off$down %in% c(1,2)] == 1, na.rm = TRUE)
+sr_off   <- mean(tm_off$success, na.rm = TRUE)
+sr_def   <- mean(tm_def$success, na.rm = TRUE)
+pass_rt  <- mean(tm_off$pass == 1, na.rm = TRUE)
+rush_rt  <- 1 - pass_rt
+third_off    <- mean(tm_off$first_down[tm_off$down == 3] == 1, na.rm = TRUE)
+third_def_tm <- mean(tm_def$first_down[tm_def$down == 3] == 1, na.rm = TRUE)
+
+# League ranks
+rank_off <- rank(-epa_off$epa_per_play)[epa_off$team == tm]
+rank_def <- rank(epa_def$epa_allowed)[epa_def$team == tm]
+
+# Down & distance pass rate
+dd <- tm_off |>
+  filter(down %in% c(1, 2, 3)) |>
+  mutate(
+    bucket = case_when(
+      ydstogo <= 3  ~ "Short",
+      ydstogo <= 7  ~ "Medium",
+      ydstogo <= 11 ~ "Standard",
+      TRUE          ~ "Long"
+    ),
+    bucket = factor(bucket, levels = c("Short","Medium","Standard","Long")),
+    down_label = paste0(down, c("st","nd","rd")[pmin(down,3)], " Down")
+  ) |>
+  group_by(down_label, bucket) |>
+  summarise(pass_rate = mean(pass == 1), n = n(), .groups = "drop")
+
+p <- ggplot(dd, aes(x = bucket, y = pass_rate, fill = pass_rate)) +
+  geom_col(width = 0.8) +
+  geom_text(aes(label = percent(pass_rate, accuracy = 1)),
+            vjust = -0.3, size = 2.8, color = text_c, fontface = "bold") +
+  facet_wrap(~down_label, nrow = 1) +
+  scale_fill_gradient2(low = accent2, mid = muted, high = accent,
+                       midpoint = 0.5, guide = "none") +
+  scale_y_continuous(labels = percent_format(accuracy = 1),
+                     expand = expansion(mult = c(0, 0.18))) +
+  labs(
+    title    = glue("{tm} — Pass Rate by Down & Distance"),
+    subtitle = glue(
+      "Off EPA/play: {round(off_epa,3)} (Rank #{rank_off})  |  ",
+      "Def EPA allowed: {round(def_epa,3)} (Rank #{rank_def})  |  ",
+      "EDPR: {percent(edpr_tm, accuracy=1)}  |  ",
+      "Off SR: {percent(sr_off, accuracy=1)}  |  ",
+      "3rd Conv: {percent(third_off, accuracy=1)}"
+    ),
+    x = "Distance to Go", y = "Pass Rate",
+    caption = "Data: nflfastR / nflverse"
+  ) +
+  theme_sharp(base_size = 10, colors = team_pal)
+
+print(p)
+
+# Draft picks table
+if (!is.null(draft_2025)) {
+  tm_draft <- draft_2025 |> filter(team == tm)
+  if (nrow(tm_draft) > 0) {
+    cat("\n\n**2025 Draft Class**\n\n")
+    tbl <- tm_draft |>
+      gt() |>
+      cols_label(round = "Rd", pick = "Pick", position = "Pos", full_name = "Player", college = "College") |>
+      cols_align(align = "center", columns = c(round, pick, position)) |>
+      cols_align(align = "left",   columns = c(full_name, college)) |>
+      gt_color_rows(round,
+        palette = c(accent, panel, muted),
+        domain  = c(1, 7)
+      ) |>
+      tab_options(
+        table.background.color         = panel,
+        column_labels.background.color = grid,
+        row.striping.background_color  = bg,
+        table.font.color               = text_c,
+        table.font.size                = px(11),
+        table.width                    = pct(60)
+      )
+    print(tbl)
+  }
+}
+
+# Trades table
+if (!is.null(trades)) {
+  tm_trades <- trades |> filter(to_team == tm | from_team == tm)
+  if (nrow(tm_trades) > 0) {
+    cat("\n\n**Trades**\n\n")
+    hide_receiving <- all(is.na(tm_trades$targets))
+    hide_rushing   <- all(is.na(tm_trades$carries))
+    tbl <- tm_trades |>
+      mutate(direction = if_else(to_team == tm, "IN", "OUT")) |>
+      select(direction, player, position, age, from_team, to_team,
+             draft_comp, off_snap_pct, route_participation,
+             targets, receptions, rec_yards, rec_tds,
+             carries, rush_yards, rush_tds) |>
+      gt() |>
+      cols_label(
+        direction          = "",
+        player             = "Player",
+        position           = "Pos",
+        age                = "Age",
+        from_team          = "From",
+        to_team            = "To",
+        draft_comp         = "Draft Comp",
+        off_snap_pct       = "Snap%",
+        route_participation = "Route%",
+        targets            = "Tgt",
+        receptions         = "Rec",
+        rec_yards          = "RecYds",
+        rec_tds            = "RecTD",
+        carries            = "Car",
+        rush_yards         = "RuYds",
+        rush_tds           = "RuTD"
+      ) |>
+      cols_align(align = "center",
+                 columns = c(direction, position, age, from_team, to_team,
+                              off_snap_pct, route_participation,
+                              targets, receptions, rec_yards, rec_tds,
+                              carries, rush_yards, rush_tds)) |>
+      cols_align(align = "left", columns = c(player, draft_comp)) |>
+      fmt_missing(columns = everything(), missing_text = "—") |>
+      gt_color_rows(off_snap_pct,
+        palette = c(muted, accent),
+        domain  = c(0, 100)
+      ) |>
+      tab_style(
+        style = cell_text(color = green_c, weight = "bold"),
+        locations = cells_body(columns = direction, rows = direction == "IN")
+      ) |>
+      tab_style(
+        style = cell_text(color = red_c, weight = "bold"),
+        locations = cells_body(columns = direction, rows = direction == "OUT")
+      ) |>
+      tab_options(
+        table.background.color         = panel,
+        column_labels.background.color = grid,
+        row.striping.background_color  = bg,
+        table.font.color               = text_c,
+        table.font.size                = px(11),
+        table.width                    = pct(85)
+      )
+    if (hide_receiving) tbl <- tbl |> cols_hide(c(route_participation, targets, receptions, rec_yards, rec_tds))
+    if (hide_rushing)   tbl <- tbl |> cols_hide(c(carries, rush_yards, rush_tds))
+    print(tbl)
+  }
+}
+
+# Free Agents table
+if (!is.null(free_agents)) {
+  tm_fa <- free_agents |> filter(to_team == tm)
+  if (nrow(tm_fa) > 0) {
+    cat("\n\n**Free Agent Signings**\n\n")
+    hide_receiving <- all(is.na(tm_fa$targets))
+    hide_rushing   <- all(is.na(tm_fa$carries))
+    tbl <- tm_fa |>
+      select(player, position, age, from_team,
+             contract_years, contract_aav, contract_total,
+             off_snap_pct, route_participation,
+             targets, receptions, rec_yards, rec_tds,
+             carries, rush_yards, rush_tds) |>
+      gt() |>
+      cols_label(
+        player              = "Player",
+        position            = "Pos",
+        age                 = "Age",
+        from_team           = "From",
+        contract_years      = "Yrs",
+        contract_aav        = "AAV ($M)",
+        contract_total      = "Total ($M)",
+        off_snap_pct        = "Snap%",
+        route_participation = "Route%",
+        targets             = "Tgt",
+        receptions          = "Rec",
+        rec_yards           = "RecYds",
+        rec_tds             = "RecTD",
+        carries             = "Car",
+        rush_yards          = "RuYds",
+        rush_tds            = "RuTD"
+      ) |>
+      cols_align(align = "center",
+                 columns = c(position, age, from_team, contract_years,
+                              contract_aav, contract_total, off_snap_pct,
+                              route_participation, targets, receptions,
+                              rec_yards, rec_tds, carries, rush_yards, rush_tds)) |>
+      cols_align(align = "left", columns = player) |>
+      fmt_missing(columns = everything(), missing_text = "—") |>
+      fmt_currency(columns = c(contract_aav, contract_total),
+                   currency = "USD", decimals = 1, suffixing = FALSE) |>
+      gt_color_rows(off_snap_pct,
+        palette = c(muted, accent),
+        domain  = c(0, 100)
+      ) |>
+      tab_options(
+        table.background.color         = panel,
+        column_labels.background.color = grid,
+        row.striping.background_color  = bg,
+        table.font.color               = text_c,
+        table.font.size                = px(11),
+        table.width                    = pct(85)
+      )
+    if (hide_receiving) tbl <- tbl |> cols_hide(c(route_participation, targets, receptions, rec_yards, rec_tds))
+    if (hide_rushing)   tbl <- tbl |> cols_hide(c(carries, rush_yards, rush_tds))
+    print(tbl)
+  }
+}
+```
+
+```{r snap-counts, results='asis', eval=exists("snap_summary") && !is.null(snap_summary)}
+if (!is.null(snap_summary)) {
+  snap_seasons <- c("2022", "2023", "2024")
+
+  snap_wide <- function(pct_col) {
+    wide <- snap_summary |>
+      filter(team == tm, !is.na(.data[[pct_col]])) |>
+      select(player, position, season, pct = all_of(pct_col)) |>
+      pivot_wider(names_from = season, values_from = pct)
+    for (s in snap_seasons) if (!s %in% names(wide)) wide[[s]] <- NA_real_
+    wide |>
+      filter(pmax(`2022`, `2023`, `2024`, na.rm = TRUE) >= 0.25) |>
+      arrange(desc(`2024`), desc(`2023`), desc(`2022`)) |>
+      select(player, position, all_of(snap_seasons))
+  }
+
+  snap_gt <- function(df) {
+    df |>
+      gt() |>
+      cols_label(player = "Player", position = "Pos") |>
+      cols_align(align = "left",   columns = player) |>
+      cols_align(align = "center", columns = c(position, all_of(snap_seasons))) |>
+      fmt_percent(columns = all_of(snap_seasons), decimals = 0) |>
+      fmt_missing(columns = everything(), missing_text = "—") |>
+      tab_options(
+        table.background.color         = panel,
+        column_labels.background.color = grid,
+        row.striping.background_color  = bg,
+        table.font.color               = text_c,
+        table.font.size                = px(11),
+        table.width                    = pct(60)
+      )
+  }
+
+  cat("\n\n## Snap Counts (2022–2024)\n\n")
+  cat("Share of team snaps in games played, ", tm,
+      " snaps only. Players with ≥ 25% share in at least one season.\n\n", sep = "")
+
+  off_df <- snap_wide("off_pct")
+  if (nrow(off_df) > 0) {
+    cat("\n\n**Offense**\n\n")
+    print(snap_gt(off_df))
+  }
+
+  def_df <- snap_wide("def_pct")
+  if (nrow(def_df) > 0) {
+    cat("\n\n**Defense**\n\n")
+    print(snap_gt(def_df))
+  }
+}
+```
+
+---
+
+*Report generated `r format(Sys.time(), '%Y-%m-%d %H:%M')` · Data: nflfastR / nflreadr / nflverse · NGS: NFL Next Gen Stats*
