@@ -1,0 +1,13 @@
+/* ── Root Variables (dark theme — league page) ───────────────────────────── */
+:root {
+  --bg:       #0d0d0d;
+  --panel:    #141414;
+  --grid:     #1e1e1e;
+  --border:   #2a2a2a;
+  --text:     #e8e8e8;
+  --muted:    #666666;
+  --accent:   #00d4ff;
+  --accent2:  #ff6b35;
+  --green:    #00e676;
+  --red:      #ff1744;
+}

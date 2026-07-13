@@ -1,0 +1,16 @@
+/* ── Root Variables (light theme — team pages) ───────────────────────────── */
+/* Defaults below match palette_light in _common.R. Each team page overrides
+   --accent/--accent2 inline with that team's own colors (see the
+   team-header chunk in nfl_sharp_team.Rmd). */
+:root {
+  --bg:       #ffffff;
+  --panel:    #f5f5f5;
+  --grid:     #e2e2e2;
+  --border:   #dcdcdc;
+  --text:     #111111;
+  --muted:    #6b6b6b;
+  --accent:   #0072ce;
+  --accent2:  #d64545;
+  --green:    #1b9e5a;
+  --red:      #d32f2f;
+}
