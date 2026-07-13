@@ -7,7 +7,7 @@ output:
     theme: "bootstrap"
     highlight: null
     self_contained: true
-    css: [styles_dark_vars.css, styles_base.css]
+    css: [styles_light_vars.css, styles_base.css]
     toc: true
     toc_float:
       collapsed: false
