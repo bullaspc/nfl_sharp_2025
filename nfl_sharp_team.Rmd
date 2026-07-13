@@ -280,7 +280,7 @@ if (!is.null(snap_summary)) {
       pivot_wider(names_from = season, values_from = pct)
     for (s in snap_seasons) if (!s %in% names(wide)) wide[[s]] <- NA_real_
     wide |>
-      filter(pmax(`2023`, `2024`, na.rm = TRUE) >= 0.1) |>
+      filter(pmax(`2022`, `2023`, `2024`, na.rm = TRUE) >= 0.25) |>
       arrange(desc(`2024`), desc(`2023`), desc(`2022`)) |>
       select(player, position, all_of(snap_seasons))
   }
@@ -305,7 +305,7 @@ if (!is.null(snap_summary)) {
 
   cat("\n\n## Snap Counts (2022–2024)\n\n")
   cat("Share of team snaps in games played, ", tm,
-      " snaps only. Players with ≥ 10% share in at least one season.\n\n", sep = "")
+      " snaps only. Players with ≥ 25% share in at least one season.\n\n", sep = "")
 
   off_df <- snap_wide("off_pct")
   if (nrow(off_df) > 0) {

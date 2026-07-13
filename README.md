@@ -66,8 +66,10 @@ This will:
 The site re-renders automatically every day at **10:00 UTC** via
 [`.github/workflows/render.yml`](.github/workflows/render.yml). The workflow
 pulls the latest nflverse data, renders all 33 pages, and commits the refreshed
-`docs/` back to `master` (logged as `chore: scheduled site render …`). If there
-are no data changes, it logs "No changes to deploy." and exits cleanly.
+`docs/` back to `master` (logged as `chore: scheduled site render …`). Because
+gt generates non-deterministic element IDs and pages embed a render timestamp,
+every successful run produces a changed `docs/` and commits it; the no-change
+guard in the workflow is a safety valve only, not a typical outcome.
 
 Manual trigger: **Actions → render-site → Run workflow** in the GitHub UI, or:
 

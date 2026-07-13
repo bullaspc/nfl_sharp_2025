@@ -40,7 +40,7 @@ red_c   <- palette_light$red
 
 # Team Pages {.section-header}
 
-Click a team to view their full team report — pass rate tendencies, draft class, trades, and free agent signings, styled in that team's own colors.
+Click a team to view their full team report — pass rate tendencies, draft class, snap counts, trades, and free agent signings, styled in that team's own colors.
 
 ```{r team-index, results='asis'}
 cat('<div class="team-grid">\n')

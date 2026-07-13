@@ -12,6 +12,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: render-site
+  cancel-in-progress: false
+
 jobs:
   render:
     runs-on: ubuntu-latest
@@ -41,5 +45,6 @@ jobs:
             echo "No changes to deploy."
           else
             git commit -m "chore: scheduled site render $(date -u +%Y-%m-%d)"
+            git pull --rebase
             git push
           fi
