@@ -13,7 +13,7 @@ built with R, nflfastR, nflreadr, and Next Gen Stats.
 | **Defense Tendencies** | EPA allowed, Success rate allowed, Pass vs Run defense, 3rd down stop rate |
 | **QB Profiles** | CPOE, EPA/attempt, Air yards, NGS time-to-throw & aggressiveness |
 | **Skill Positions** | Receiver target share, YAC, EPA/target, NGS separation; Rusher EPA/carry |
-| **Team Summaries** | Per-team pass rate by down & distance with key stat header (all 32 teams) |
+| **Team Pages** | One page per team (own colors, white background): pass rate by down & distance, draft class, trades, free agent signings, snap counts (2022–2024) |
 
 ---
 
@@ -27,7 +27,7 @@ source("render.R")
 This will:
 1. Install all required packages (nflreadr, nflfastR, gt, gtExtras, ggrepel, etc.)
 2. Download 2025 season play-by-play data from nflverse (~150MB, cached after first run)
-3. Render `output/nfl_sharp_2025.html`
+3. Render `docs/index.html` (league overview) and `docs/teams/{TEAM}.html` for all 32 teams — `docs/` is served directly by GitHub Pages, no manual copy step needed
 
 ---
 
@@ -61,14 +61,37 @@ This will:
 
 ---
 
+## Automatic Updates
+
+The site re-renders automatically every day at **10:00 UTC** via
+[`.github/workflows/render.yml`](.github/workflows/render.yml). The workflow
+pulls the latest nflverse data, renders all 33 pages, and commits the refreshed
+`docs/` back to `master` (logged as `chore: scheduled site render …`). If there
+are no data changes, it logs "No changes to deploy." and exits cleanly.
+
+Manual trigger: **Actions → render-site → Run workflow** in the GitHub UI, or:
+
+```bash
+gh workflow run render-site --repo bullaspc/nfl_sharp_2025
+```
+
+---
+
 ## Project Structure
 
 ```
 nfl_sharp_2025/
-├── nfl_sharp_2025.Rmd   # Main analysis + report
-├── styles.css           # Dark theme CSS
-├── render.R             # Install packages + render
-├── README.md            # This file
-└── output/
-    └── nfl_sharp_2025.html   # Generated report
+├── _common.R               # Shared data load, palettes, theme_sharp(), league summaries
+├── nfl_sharp_league.Rmd    # League overview page (dark theme)
+├── nfl_sharp_team.Rmd      # Per-team page template (params$team, light/team-branded theme)
+├── styles_base.css         # Structural CSS shared by both page types
+├── styles_dark_vars.css    # Dark color variables (league page)
+├── styles_light_vars.css   # Light color variables (team pages)
+├── render.R                # Install packages + render league page + 32 team pages
+├── README.md                # This file
+└── docs/                    # Generated site (GitHub Pages source)
+    ├── index.html            # League overview
+    └── teams/
+        ├── ARI.html
+        └── ...                # One file per team
 ```
