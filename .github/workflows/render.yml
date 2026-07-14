@@ -43,8 +43,30 @@ jobs:
           git add docs/
           if git diff --cached --quiet; then
             echo "No changes to deploy."
-          else
-            git commit -m "chore: scheduled site render $(date -u +%Y-%m-%d)"
-            git pull --rebase
-            git push
+            exit 0
           fi
+          git commit -m "chore: scheduled site render $(date -u +%Y-%m-%d)"
+
+          # docs/ is fully machine-generated (every page carries a live
+          # "Report generated <timestamp>" footer), so two renders committed
+          # close together always conflict on those lines even when nothing
+          # substantive differs. On conflict, prefer whatever's already on
+          # origin (the more recently pushed render) via -X ours, then retry
+          # a few times in case another push races in again.
+          for attempt in 1 2 3 4 5; do
+            if git push; then
+              exit 0
+            fi
+            echo "Push rejected (attempt $attempt) — rebasing onto latest origin/master..."
+            git fetch origin master
+            if git rebase -X ours origin/master; then
+              continue
+            fi
+            echo "Rebase conflict — keeping origin's already-pushed render for conflicting lines."
+            git checkout --ours -- docs/ 2>/dev/null || true
+            git add docs/
+            git -c core.editor=true rebase --continue
+          done
+
+          echo "Failed to push docs after retries."
+          exit 1

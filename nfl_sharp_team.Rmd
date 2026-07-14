@@ -269,6 +269,75 @@ if (!is.null(free_agents)) {
 }
 ```
 
+```{r schedule-2025, results='asis', eval=exists("season_2025_games") && !is.null(season_2025_games)}
+tm_sched <- season_2025_games |>
+  filter(team == tm) |>
+  arrange(week) |>
+  mutate(
+    opponent_label = if_else(is_home, paste0("vs ", opponent), paste0("@ ", opponent)),
+    score = paste0(team_score, "-", opp_score)
+  ) |>
+  select(week, gameday, opponent_label, result, score,
+         off_epa_play, off_edsr, def_epa_play, def_edsr)
+
+if (nrow(tm_sched) > 0) {
+  cat("\n\n## 2025 Season Schedule & Results\n\n")
+
+  w <- sum(tm_sched$result == "W")
+  l <- sum(tm_sched$result == "L")
+  t <- sum(tm_sched$result == "T")
+  record_label <- if (t > 0) glue("{w}-{l}-{t}") else glue("{w}-{l}")
+
+  cat(glue(
+    "**Final Record: {record_label}**  |  ",
+    "Off EPA/Play: {round(mean(tm_sched$off_epa_play, na.rm = TRUE), 3)}  |  ",
+    "Off Early-Down SR: {percent(mean(tm_sched$off_edsr, na.rm = TRUE), accuracy = 1)}  |  ",
+    "Def EPA/Play Allowed: {round(mean(tm_sched$def_epa_play, na.rm = TRUE), 3)}  |  ",
+    "Def Early-Down SR Allowed: {percent(mean(tm_sched$def_edsr, na.rm = TRUE), accuracy = 1)}"
+  ), "\n\n")
+
+  tbl <- tm_sched |>
+    gt() |>
+    cols_label(
+      week           = "Wk",
+      gameday        = "Date",
+      opponent_label = "Opponent",
+      result         = "Result",
+      score          = "Score",
+      off_epa_play   = "Off EPA/Play",
+      off_edsr       = "Off Early-Down SR",
+      def_epa_play   = "Def EPA/Play",
+      def_edsr       = "Def Early-Down SR"
+    ) |>
+    fmt_number(columns = c(off_epa_play, def_epa_play), decimals = 3) |>
+    fmt_percent(columns = c(off_edsr, def_edsr), decimals = 0) |>
+    fmt_missing(columns = everything(), missing_text = "—") |>
+    cols_align(align = "center",
+               columns = c(week, gameday, result, score,
+                            off_epa_play, off_edsr, def_epa_play, def_edsr)) |>
+    cols_align(align = "left", columns = opponent_label) |>
+    tab_style(
+      style = cell_text(color = green_c, weight = "bold"),
+      locations = cells_body(columns = result, rows = result == "W")
+    ) |>
+    tab_style(
+      style = cell_text(color = red_c, weight = "bold"),
+      locations = cells_body(columns = result, rows = result == "L")
+    ) |>
+    gt_color_rows(off_epa_play, palette = c(accent2, panel, accent),  domain = c(-0.3, 0.3)) |>
+    gt_color_rows(def_epa_play, palette = c(accent, panel, accent2),  domain = c(-0.3, 0.3)) |>
+    tab_options(
+      table.background.color         = panel,
+      column_labels.background.color = grid,
+      row.striping.background_color  = bg,
+      table.font.color               = text_c,
+      table.font.size                = px(11),
+      table.width                    = pct(90)
+    )
+  print(tbl)
+}
+```
+
 ```{r snap-counts, results='asis', eval=exists("snap_summary") && !is.null(snap_summary)}
 if (!is.null(snap_summary)) {
   snap_seasons <- c("2022", "2023", "2024")

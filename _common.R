@@ -199,6 +199,56 @@ post <- plays |> filter(season_type == "POST")
 
 all_teams <- sort(unique(reg$posteam))
 
+# 2025 (this season) schedule, results, and per-game team EPA/success rate
+# for the team-page "Season Schedule & Results" table. Reuses `reg` (already
+# loaded above) rather than downloading a second season of pbp data.
+schedules_2025 <- tryCatch(load_schedules(2025), error = function(e) NULL)
+
+# Per-game, per-team offense/defense EPA-per-play and early-down (1st/2nd)
+# success rate, one row per team per game.
+game_team_stats_2025 <- {
+  off <- reg |>
+    group_by(game_id, team = posteam) |>
+    summarise(
+      off_epa_play = mean(epa),
+      off_edsr     = mean(success[down %in% c(1, 2)], na.rm = TRUE),
+      .groups = "drop"
+    )
+  def <- reg |>
+    group_by(game_id, team = defteam) |>
+    summarise(
+      def_epa_play = mean(epa),
+      def_edsr     = mean(success[down %in% c(1, 2)], na.rm = TRUE),
+      .groups = "drop"
+    )
+  full_join(off, def, by = c("game_id", "team"))
+}
+
+# Long-format 2025 schedule: one row per team per played game, with the
+# opponent, home/away, final score, and W/L/T result from that team's side.
+season_2025_games <- if (!is.null(schedules_2025)) {
+  reg_sched <- schedules_2025 |> filter(game_type == "REG")
+
+  home <- reg_sched |>
+    transmute(game_id, week, gameday, team = home_team, opponent = away_team,
+              is_home = TRUE, team_score = home_score, opp_score = away_score)
+  away <- reg_sched |>
+    transmute(game_id, week, gameday, team = away_team, opponent = home_team,
+              is_home = FALSE, team_score = away_score, opp_score = home_score)
+
+  bind_rows(home, away) |>
+    filter(!is.na(team_score), !is.na(opp_score)) |>
+    mutate(
+      result = case_when(
+        team_score > opp_score ~ "W",
+        team_score < opp_score ~ "L",
+        TRUE ~ "T"
+      )
+    ) |>
+    left_join(game_team_stats_2025, by = c("game_id", "team")) |>
+    arrange(team, week)
+} else NULL
+
 message("Data loaded. Building league-wide summaries...")
 
 # ── League-wide summaries ─────────────────────────────────────────────────────
