@@ -269,8 +269,8 @@ if (!is.null(free_agents)) {
 }
 ```
 
-```{r schedule-2024, results='asis', eval=exists("season_2024_games") && !is.null(season_2024_games)}
-tm_sched <- season_2024_games |>
+```{r schedule-2025, results='asis', eval=exists("season_2025_games") && !is.null(season_2025_games)}
+tm_sched <- season_2025_games |>
   filter(team == tm) |>
   arrange(week) |>
   mutate(
@@ -281,7 +281,7 @@ tm_sched <- season_2024_games |>
          off_epa_play, off_edsr, def_epa_play, def_edsr)
 
 if (nrow(tm_sched) > 0) {
-  cat("\n\n## 2024 Season Schedule & Results\n\n")
+  cat("\n\n## 2025 Season Schedule & Results\n\n")
 
   w <- sum(tm_sched$result == "W")
   l <- sum(tm_sched$result == "L")
