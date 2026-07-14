@@ -231,10 +231,12 @@ season_2025_games <- if (!is.null(schedules_2025)) {
 
   home <- reg_sched |>
     transmute(game_id, week, gameday, team = home_team, opponent = away_team,
-              is_home = TRUE, team_score = home_score, opp_score = away_score)
+              is_home = TRUE, team_score = home_score, opp_score = away_score,
+              spread = -spread_line, moneyline = home_moneyline, total = total_line)
   away <- reg_sched |>
     transmute(game_id, week, gameday, team = away_team, opponent = home_team,
-              is_home = FALSE, team_score = away_score, opp_score = home_score)
+              is_home = FALSE, team_score = away_score, opp_score = home_score,
+              spread = spread_line, moneyline = away_moneyline, total = total_line)
 
   bind_rows(home, away) |>
     filter(!is.na(team_score), !is.na(opp_score)) |>
@@ -246,6 +248,27 @@ season_2025_games <- if (!is.null(schedules_2025)) {
       )
     ) |>
     left_join(game_team_stats_2025, by = c("game_id", "team")) |>
+    arrange(team, week)
+} else NULL
+
+# 2026 (next season) schedule with opening/current betting lines, for the
+# team-page "2026 Schedule" preview table. No results/EPA yet since these
+# games haven't been played.
+schedules_2026 <- tryCatch(load_schedules(2026), error = function(e) NULL)
+
+season_2026_games <- if (!is.null(schedules_2026)) {
+  reg_sched <- schedules_2026 |> filter(game_type == "REG")
+
+  home <- reg_sched |>
+    transmute(game_id, week, gameday, team = home_team, opponent = away_team,
+              is_home = TRUE, spread = -spread_line, moneyline = home_moneyline,
+              total = total_line)
+  away <- reg_sched |>
+    transmute(game_id, week, gameday, team = away_team, opponent = home_team,
+              is_home = FALSE, spread = spread_line, moneyline = away_moneyline,
+              total = total_line)
+
+  bind_rows(home, away) |>
     arrange(team, week)
 } else NULL
 

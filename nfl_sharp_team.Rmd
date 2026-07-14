@@ -278,6 +278,7 @@ tm_sched <- season_2025_games |>
     score = paste0(team_score, "-", opp_score)
   ) |>
   select(week, gameday, opponent_label, result, score,
+         spread, moneyline, total,
          off_epa_play, off_edsr, def_epa_play, def_edsr)
 
 if (nrow(tm_sched) > 0) {
@@ -304,6 +305,9 @@ if (nrow(tm_sched) > 0) {
       opponent_label = "Opponent",
       result         = "Result",
       score          = "Score",
+      spread         = "Spread",
+      moneyline      = "ML",
+      total          = "O/U",
       off_epa_play   = "Off EPA/Play",
       off_edsr       = "Off Early-Down SR",
       def_epa_play   = "Def EPA/Play",
@@ -311,9 +315,12 @@ if (nrow(tm_sched) > 0) {
     ) |>
     fmt_number(columns = c(off_epa_play, def_epa_play), decimals = 3) |>
     fmt_percent(columns = c(off_edsr, def_edsr), decimals = 0) |>
+    fmt_number(columns = spread, decimals = 1, force_sign = TRUE) |>
+    fmt_number(columns = moneyline, decimals = 0, force_sign = TRUE) |>
+    fmt_number(columns = total, decimals = 1) |>
     fmt_missing(columns = everything(), missing_text = "—") |>
     cols_align(align = "center",
-               columns = c(week, gameday, result, score,
+               columns = c(week, gameday, result, score, spread, moneyline, total,
                             off_epa_play, off_edsr, def_epa_play, def_edsr)) |>
     cols_align(align = "left", columns = opponent_label) |>
     tab_style(
@@ -326,6 +333,7 @@ if (nrow(tm_sched) > 0) {
     ) |>
     gt_color_rows(off_epa_play, palette = c(accent2, panel, accent),  domain = c(-0.3, 0.3)) |>
     gt_color_rows(def_epa_play, palette = c(accent, panel, accent2),  domain = c(-0.3, 0.3)) |>
+    gt_color_rows(spread, palette = c(green_c, panel, red_c), domain = c(-14, 14)) |>
     tab_options(
       table.background.color         = panel,
       column_labels.background.color = grid,
@@ -333,6 +341,47 @@ if (nrow(tm_sched) > 0) {
       table.font.color               = text_c,
       table.font.size                = px(11),
       table.width                    = pct(90)
+    )
+  print(tbl)
+}
+```
+
+```{r schedule-2026, results='asis', eval=exists("season_2026_games") && !is.null(season_2026_games)}
+tm_sched_2026 <- season_2026_games |>
+  filter(team == tm) |>
+  arrange(week) |>
+  mutate(
+    opponent_label = if_else(is_home, paste0("vs ", opponent), paste0("@ ", opponent))
+  ) |>
+  select(week, gameday, opponent_label, spread, moneyline, total)
+
+if (nrow(tm_sched_2026) > 0) {
+  cat("\n\n## 2026 Schedule\n\n")
+
+  tbl <- tm_sched_2026 |>
+    gt() |>
+    cols_label(
+      week           = "Wk",
+      gameday        = "Date",
+      opponent_label = "Opponent",
+      spread         = "Spread",
+      moneyline      = "ML",
+      total          = "O/U"
+    ) |>
+    fmt_number(columns = spread, decimals = 1, force_sign = TRUE) |>
+    fmt_number(columns = moneyline, decimals = 0, force_sign = TRUE) |>
+    fmt_number(columns = total, decimals = 1) |>
+    fmt_missing(columns = everything(), missing_text = "—") |>
+    cols_align(align = "center", columns = c(week, gameday, spread, moneyline, total)) |>
+    cols_align(align = "left", columns = opponent_label) |>
+    gt_color_rows(spread, palette = c(green_c, panel, red_c), domain = c(-14, 14)) |>
+    tab_options(
+      table.background.color         = panel,
+      column_labels.background.color = grid,
+      row.striping.background_color  = bg,
+      table.font.color               = text_c,
+      table.font.size                = px(11),
+      table.width                    = pct(70)
     )
   print(tbl)
 }
