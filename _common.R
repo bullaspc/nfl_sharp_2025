@@ -155,6 +155,68 @@ free_agents <- tryCatch(
   error = function(e) NULL
 )
 
+# 2024 (last season) schedule, results, and per-game team EPA/success rate
+# for the team-page "Season Schedule & Results" table.
+message("Loading 2024 play-by-play and schedule data (last season)...")
+pbp_2024_raw <- tryCatch(load_pbp(2024), error = function(e) NULL)
+
+plays_2024 <- if (!is.null(pbp_2024_raw)) {
+  pbp_2024_raw |>
+    filter(
+      season_type == "REG",
+      play_type %in% c("pass", "run"),
+      !is.na(epa),
+      !is.na(posteam)
+    )
+} else NULL
+
+schedules_2024 <- tryCatch(load_schedules(2024), error = function(e) NULL)
+
+# Per-game, per-team offense/defense EPA-per-play and early-down (1st/2nd)
+# success rate, one row per team per game.
+game_team_stats_2024 <- if (!is.null(plays_2024)) {
+  off <- plays_2024 |>
+    group_by(game_id, team = posteam) |>
+    summarise(
+      off_epa_play = mean(epa),
+      off_edsr     = mean(success[down %in% c(1, 2)], na.rm = TRUE),
+      .groups = "drop"
+    )
+  def <- plays_2024 |>
+    group_by(game_id, team = defteam) |>
+    summarise(
+      def_epa_play = mean(epa),
+      def_edsr     = mean(success[down %in% c(1, 2)], na.rm = TRUE),
+      .groups = "drop"
+    )
+  full_join(off, def, by = c("game_id", "team"))
+} else NULL
+
+# Long-format 2024 schedule: one row per team per played game, with the
+# opponent, home/away, final score, and W/L/T result from that team's side.
+season_2024_games <- if (!is.null(schedules_2024) && !is.null(game_team_stats_2024)) {
+  reg_2024 <- schedules_2024 |> filter(game_type == "REG")
+
+  home <- reg_2024 |>
+    transmute(game_id, week, gameday, team = home_team, opponent = away_team,
+              is_home = TRUE, team_score = home_score, opp_score = away_score)
+  away <- reg_2024 |>
+    transmute(game_id, week, gameday, team = away_team, opponent = home_team,
+              is_home = FALSE, team_score = away_score, opp_score = home_score)
+
+  bind_rows(home, away) |>
+    filter(!is.na(team_score), !is.na(opp_score)) |>
+    mutate(
+      result = case_when(
+        team_score > opp_score ~ "W",
+        team_score < opp_score ~ "L",
+        TRUE ~ "T"
+      )
+    ) |>
+    left_join(game_team_stats_2024, by = c("game_id", "team")) |>
+    arrange(team, week)
+} else NULL
+
 # Snap counts (2022–2024) for team-page snap share tables
 snaps <- tryCatch(
   load_snap_counts(seasons = 2022:2024),
