@@ -140,7 +140,7 @@ if (!is.null(draft_2025)) {
         table.font.size                = px(11),
         table.width                    = pct(60)
       )
-    print(tbl)
+    cat(as_raw_html(tbl, inline_css = TRUE))
   }
 }
 
@@ -205,7 +205,7 @@ if (!is.null(trades)) {
       )
     if (hide_receiving) tbl <- tbl |> cols_hide(c(route_participation, targets, receptions, rec_yards, rec_tds))
     if (hide_rushing)   tbl <- tbl |> cols_hide(c(carries, rush_yards, rush_tds))
-    print(tbl)
+    cat(as_raw_html(tbl, inline_css = TRUE))
   }
 }
 
@@ -264,7 +264,7 @@ if (!is.null(free_agents)) {
       )
     if (hide_receiving) tbl <- tbl |> cols_hide(c(route_participation, targets, receptions, rec_yards, rec_tds))
     if (hide_rushing)   tbl <- tbl |> cols_hide(c(carries, rush_yards, rush_tds))
-    print(tbl)
+    cat(as_raw_html(tbl, inline_css = TRUE))
   }
 }
 ```
@@ -342,7 +342,7 @@ if (nrow(tm_sched) > 0) {
       table.font.size                = px(11),
       table.width                    = pct(90)
     )
-  print(tbl)
+  cat(as_raw_html(tbl, inline_css = TRUE))
 }
 ```
 
@@ -383,7 +383,7 @@ if (nrow(tm_sched_2026) > 0) {
       table.font.size                = px(11),
       table.width                    = pct(70)
     )
-  print(tbl)
+  cat(as_raw_html(tbl, inline_css = TRUE))
 }
 ```
 
@@ -428,13 +428,13 @@ if (!is.null(snap_summary)) {
   off_df <- snap_wide("off_pct")
   if (nrow(off_df) > 0) {
     cat("\n\n**Offense**\n\n")
-    print(snap_gt(off_df))
+    cat(as_raw_html(snap_gt(off_df), inline_css = TRUE))
   }
 
   def_df <- snap_wide("def_pct")
   if (nrow(def_df) > 0) {
     cat("\n\n**Defense**\n\n")
-    print(snap_gt(def_df))
+    cat(as_raw_html(snap_gt(def_df), inline_css = TRUE))
   }
 }
 ```
