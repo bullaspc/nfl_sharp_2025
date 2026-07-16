@@ -381,4 +381,54 @@ rush_base <- reg |>
   rename(team = posteam) |>
   add_team_colors()
 
+# Explosive drive rate: share of a team's offensive drives (scrimmage plays
+# only — `reg` is already filtered to pass/run) with >= 3 plays AND >= 30
+# total yards gained. Used for the team-page league-rank table.
+drive_stats <- reg |>
+  filter(!is.na(drive)) |>
+  group_by(game_id, posteam, drive) |>
+  summarise(
+    n_plays     = n(),
+    drive_yards = sum(yards_gained, na.rm = TRUE),
+    .groups     = "drop"
+  ) |>
+  mutate(explosive = n_plays >= 3 & drive_yards >= 30)
+
+explosive_drives <- drive_stats |>
+  group_by(posteam) |>
+  summarise(
+    explosive_drive_rate = mean(explosive),
+    n_drives             = n(),
+    .groups              = "drop"
+  ) |>
+  rename(team = posteam) |>
+  add_team_colors() |>
+  arrange(desc(explosive_drive_rate))
+
+# Team-level rushing/passing offense EPA-per-play and success rate, for the
+# team-page league-rank table (rank_off/rank_def above are all-plays only).
+rush_off <- reg |>
+  filter(rush == 1) |>
+  group_by(posteam) |>
+  summarise(
+    epa_per_play = mean(epa),
+    success_rate = mean(success, na.rm = TRUE),
+    n_plays      = n(),
+    .groups      = "drop"
+  ) |>
+  rename(team = posteam) |>
+  add_team_colors()
+
+pass_off <- reg |>
+  filter(pass == 1) |>
+  group_by(posteam) |>
+  summarise(
+    epa_per_play = mean(epa),
+    success_rate = mean(success, na.rm = TRUE),
+    n_plays      = n(),
+    .groups      = "drop"
+  ) |>
+  rename(team = posteam) |>
+  add_team_colors()
+
 message("Shared data ready.")
