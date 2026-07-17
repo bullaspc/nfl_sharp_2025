@@ -170,17 +170,51 @@ snap_summary <- if (!is.null(snaps)) {
     if (!any(ok)) return(NA_real_)
     sum(snap_n[ok]) / sum(snap_n[ok] / pct[ok])
   }
+  first_non_na <- function(x) {
+    x <- x[!is.na(x)]
+    if (length(x) == 0) NA_character_ else x[1]
+  }
   snaps |>
     filter(game_type == "REG") |>
     mutate(team = clean_team_abbrs(team)) |>
     group_by(player, position, team, season) |>
     summarise(
-      games   = n(),
-      off_pct = season_share(offense_snaps, offense_pct),
-      def_pct = season_share(defense_snaps, defense_pct),
+      games         = n(),
+      off_pct       = season_share(offense_snaps, offense_pct),
+      def_pct       = season_share(defense_snaps, defense_pct),
+      pfr_player_id = first_non_na(pfr_player_id),
       .groups = "drop"
     )
 } else NULL
+
+# Current-season roster (for the "on roster now" flag in the team-page
+# snap-count table, which is otherwise 2022-2024 historical data only).
+rosters_2025 <- tryCatch(
+  load_rosters(seasons = 2025),
+  error = function(e) NULL
+)
+
+# Distinct (team, PFR player id) pairs currently on a roster. Joined against
+# snap_summary's pfr_player_id below, since load_snap_counts() (PFR-sourced)
+# and load_rosters() share pfr_id/pfr_player_id as their common key — player
+# names alone aren't a safe join key (suffixes, punctuation can differ).
+current_roster_ids <- if (!is.null(rosters_2025) && "pfr_id" %in% names(rosters_2025)) {
+  rosters_2025 |>
+    filter(!is.na(pfr_id)) |>
+    mutate(team = clean_team_abbrs(team)) |>
+    distinct(team, pfr_id)
+} else NULL
+
+if (!is.null(snap_summary)) {
+  snap_summary <- snap_summary |>
+    mutate(
+      on_roster = if (!is.null(current_roster_ids)) {
+        paste(team, pfr_player_id) %in% paste(current_roster_ids$team, current_roster_ids$pfr_id)
+      } else {
+        NA
+      }
+    )
+}
 
 # Team logos/colors
 teams <- load_teams()
@@ -378,6 +412,56 @@ rush_base <- reg |>
     .groups    = "drop"
   ) |>
   filter(carries >= 60) |>
+  rename(team = posteam) |>
+  add_team_colors()
+
+# Explosive drive rate: share of a team's offensive drives (scrimmage plays
+# only — `reg` is already filtered to pass/run) with >= 3 plays AND >= 30
+# total yards gained. Used for the team-page league-rank table.
+drive_stats <- reg |>
+  filter(!is.na(drive)) |>
+  group_by(game_id, posteam, drive) |>
+  summarise(
+    n_plays     = n(),
+    drive_yards = sum(yards_gained, na.rm = TRUE),
+    .groups     = "drop"
+  ) |>
+  mutate(explosive = n_plays >= 3 & drive_yards >= 30)
+
+explosive_drives <- drive_stats |>
+  group_by(posteam) |>
+  summarise(
+    explosive_drive_rate = mean(explosive),
+    n_drives             = n(),
+    .groups              = "drop"
+  ) |>
+  rename(team = posteam) |>
+  add_team_colors() |>
+  arrange(desc(explosive_drive_rate))
+
+# Team-level rushing/passing offense EPA-per-play and success rate, for the
+# team-page league-rank table (rank_off/rank_def above are all-plays only).
+rush_off <- reg |>
+  filter(rush == 1) |>
+  group_by(posteam) |>
+  summarise(
+    epa_per_play = mean(epa),
+    success_rate = mean(success, na.rm = TRUE),
+    n_plays      = n(),
+    .groups      = "drop"
+  ) |>
+  rename(team = posteam) |>
+  add_team_colors()
+
+pass_off <- reg |>
+  filter(pass == 1) |>
+  group_by(posteam) |>
+  summarise(
+    epa_per_play = mean(epa),
+    success_rate = mean(success, na.rm = TRUE),
+    n_plays      = n(),
+    .groups      = "drop"
+  ) |>
   rename(team = posteam) |>
   add_team_colors()
 

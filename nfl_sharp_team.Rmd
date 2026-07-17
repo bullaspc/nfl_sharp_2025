@@ -269,6 +269,65 @@ if (!is.null(free_agents)) {
 }
 ```
 
+```{r rank-metrics, results='asis'}
+# ── League Ranking Metrics ─────────────────────────────────────────────────
+# Rank 1 = best across all 32 teams for every metric below.
+n_teams <- length(all_teams)
+
+rank_of <- function(df, col, higher_is_better = TRUE) {
+  vals <- if (higher_is_better) -df[[col]] else df[[col]]
+  rank(vals, ties.method = "min")[df$team == tm]
+}
+
+rank_metrics <- tibble::tibble(
+  metric = c(
+    "Explosive Drive % (≥30 yds, ≥3 plays)",
+    "Rush Success Rate",
+    "Rush EPA/Play",
+    "Pass Success Rate",
+    "Pass EPA/Play"
+  ),
+  value = c(
+    explosive_drives$explosive_drive_rate[explosive_drives$team == tm],
+    rush_off$success_rate[rush_off$team == tm],
+    rush_off$epa_per_play[rush_off$team == tm],
+    pass_off$success_rate[pass_off$team == tm],
+    pass_off$epa_per_play[pass_off$team == tm]
+  ),
+  rank = c(
+    rank_of(explosive_drives, "explosive_drive_rate"),
+    rank_of(rush_off, "success_rate"),
+    rank_of(rush_off, "epa_per_play"),
+    rank_of(pass_off, "success_rate"),
+    rank_of(pass_off, "epa_per_play")
+  ),
+  is_pct = c(TRUE, TRUE, FALSE, TRUE, FALSE)
+)
+
+cat("\n\n## League Ranking Metrics\n\n")
+
+rank_tbl <- rank_metrics |>
+  mutate(
+    value_fmt = if_else(is_pct, percent(value, accuracy = 0.1), sprintf("%.3f", value))
+  ) |>
+  select(metric, value_fmt, rank) |>
+  gt() |>
+  cols_label(metric = "Metric", value_fmt = "Value", rank = "League Rank") |>
+  cols_align(align = "left", columns = metric) |>
+  cols_align(align = "center", columns = c(value_fmt, rank)) |>
+  fmt(columns = rank, fns = function(x) paste0("#", x, " of ", n_teams)) |>
+  gt_color_rows(rank, palette = c(green_c, panel, red_c), domain = c(1, n_teams)) |>
+  tab_options(
+    table.background.color         = panel,
+    column_labels.background.color = grid,
+    row.striping.background_color  = bg,
+    table.font.color               = text_c,
+    table.font.size                = px(11),
+    table.width                    = pct(60)
+  )
+cat(as_raw_html(rank_tbl, inline_css = TRUE))
+```
+
 ```{r schedule-2025, results='asis', eval=exists("season_2025_games") && !is.null(season_2025_games)}
 tm_sched <- season_2025_games |>
   filter(team == tm) |>
@@ -394,23 +453,37 @@ if (!is.null(snap_summary)) {
   snap_wide <- function(pct_col) {
     wide <- snap_summary |>
       filter(team == tm, !is.na(.data[[pct_col]])) |>
-      select(player, position, season, pct = all_of(pct_col)) |>
+      select(player, position, on_roster, season, pct = all_of(pct_col)) |>
       pivot_wider(names_from = season, values_from = pct)
     for (s in snap_seasons) if (!s %in% names(wide)) wide[[s]] <- NA_real_
     wide |>
       filter(pmax(`2022`, `2023`, `2024`, na.rm = TRUE) >= 0.25) |>
-      arrange(desc(`2024`), desc(`2023`), desc(`2022`)) |>
-      select(player, position, all_of(snap_seasons))
+      arrange(desc(on_roster), desc(`2024`), desc(`2023`), desc(`2022`)) |>
+      select(player, position, on_roster, all_of(snap_seasons))
   }
 
   snap_gt <- function(df) {
     df |>
+      mutate(current = case_when(
+        is.na(on_roster) ~ NA_character_,
+        on_roster         ~ "Yes",
+        TRUE              ~ "No"
+      )) |>
+      select(player, position, current, all_of(snap_seasons)) |>
       gt() |>
-      cols_label(player = "Player", position = "Pos") |>
+      cols_label(player = "Player", position = "Pos", current = "On Roster Now") |>
       cols_align(align = "left",   columns = player) |>
-      cols_align(align = "center", columns = c(position, all_of(snap_seasons))) |>
+      cols_align(align = "center", columns = c(position, current, all_of(snap_seasons))) |>
       fmt_percent(columns = all_of(snap_seasons), decimals = 0) |>
       fmt_missing(columns = everything(), missing_text = "—") |>
+      tab_style(
+        style = cell_text(color = green_c, weight = "bold"),
+        locations = cells_body(columns = current, rows = current == "Yes")
+      ) |>
+      tab_style(
+        style = cell_text(color = muted, weight = "bold"),
+        locations = cells_body(columns = current, rows = current == "No")
+      ) |>
       tab_options(
         table.background.color         = panel,
         column_labels.background.color = grid,
@@ -423,7 +496,9 @@ if (!is.null(snap_summary)) {
 
   cat("\n\n## Snap Counts (2022–2024)\n\n")
   cat("Share of team snaps in games played, ", tm,
-      " snaps only. Players with ≥ 25% share in at least one season.\n\n", sep = "")
+      " snaps only. Players with ≥ 25% share in at least one season. ",
+      "\"On Roster Now\" reflects each player's 2025 roster status ",
+      "(matched via Pro Football Reference player ID).\n\n", sep = "")
 
   off_df <- snap_wide("off_pct")
   if (nrow(off_df) > 0) {
