@@ -451,10 +451,22 @@ if (!is.null(snap_summary)) {
   snap_seasons <- c("2022", "2023", "2024")
 
   snap_wide <- function(pct_col) {
-    wide <- snap_summary |>
-      filter(team == tm, !is.na(.data[[pct_col]])) |>
-      select(player, position, on_roster, season, pct = all_of(pct_col)) |>
-      pivot_wider(names_from = season, values_from = pct)
+    df <- snap_summary |>
+      filter(team == tm, !is.na(.data[[pct_col]]))
+
+    # A player's per-season position label can still shift year to year
+    # (e.g. safety used more as a corner in one season); collapse to each
+    # player's most common label here so pivot_wider doesn't split them
+    # back into separate rows keyed on a differing position value.
+    player_position <- df |>
+      count(player, position, sort = TRUE) |>
+      distinct(player, .keep_all = TRUE) |>
+      select(player, position)
+
+    wide <- df |>
+      select(player, on_roster, season, pct = all_of(pct_col)) |>
+      pivot_wider(names_from = season, values_from = pct) |>
+      left_join(player_position, by = "player")
     for (s in snap_seasons) if (!s %in% names(wide)) wide[[s]] <- NA_real_
     wide |>
       filter(pmax(`2022`, `2023`, `2024`, na.rm = TRUE) >= 0.25) |>
