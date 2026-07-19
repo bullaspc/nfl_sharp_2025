@@ -174,12 +174,22 @@ snap_summary <- if (!is.null(snaps)) {
     x <- x[!is.na(x)]
     if (length(x) == 0) NA_character_ else x[1]
   }
+  # PFR's per-game position label isn't stable within a season (e.g. a
+  # corner logged as CB some weeks and DB others, a safety as FS/SS/DB) —
+  # grouping by position would split one player into several rows, so we
+  # group by player/team/season only and report their most common label.
+  most_common <- function(x) {
+    x <- x[!is.na(x)]
+    if (length(x) == 0) return(NA_character_)
+    names(sort(table(x), decreasing = TRUE))[1]
+  }
   snaps |>
     filter(game_type == "REG") |>
     mutate(team = clean_team_abbrs(team)) |>
-    group_by(player, position, team, season) |>
+    group_by(player, team, season) |>
     summarise(
       games         = n(),
+      position      = most_common(position),
       off_pct       = season_share(offense_snaps, offense_pct),
       def_pct       = season_share(defense_snaps, defense_pct),
       pfr_player_id = first_non_na(pfr_player_id),
