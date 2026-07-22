@@ -58,6 +58,39 @@ cat(glue(
 cat('[← League Overview](../index.html)\n\n')
 ```
 
+```{r coaching-staff, results='asis'}
+# ── Coaching Staff ──────────────────────────────────────────────────────────
+# Head coach is derived automatically from schedule data (team_coaches);
+# coordinators/other staff come from the manually-maintained coaching_staff
+# CSV, since nflverse has no coordinator-level dataset.
+tm_head_coach <- if (!is.null(team_coaches)) team_coaches$head_coach[team_coaches$team == tm] else character(0)
+tm_staff <- if (!is.null(coaching_staff)) coaching_staff |> filter(team == tm) else NULL
+
+staff_rows <- bind_rows(
+  if (length(tm_head_coach) > 0 && !is.na(tm_head_coach[1])) {
+    tibble::tibble(role = "Head Coach", name = tm_head_coach[1])
+  } else NULL,
+  if (!is.null(tm_staff) && nrow(tm_staff) > 0) tm_staff |> select(role, name) else NULL
+)
+
+if (nrow(staff_rows) > 0) {
+  cat("\n\n## Coaching Staff\n\n")
+  tbl <- staff_rows |>
+    gt() |>
+    cols_label(role = "Role", name = "Name") |>
+    cols_align(align = "left", columns = c(role, name)) |>
+    tab_options(
+      table.background.color         = panel,
+      column_labels.background.color = grid,
+      row.striping.background_color  = bg,
+      table.font.color               = text_c,
+      table.font.size                = px(11),
+      table.width                    = pct(40)
+    )
+  cat(as_raw_html(tbl, inline_css = TRUE))
+}
+```
+
 ```{r team-summary, results='asis', fig.height=5}
 # ── Sharp-Style Team Summary ───────────────────────────────────────────────
 tm_off <- reg |> filter(posteam == tm)

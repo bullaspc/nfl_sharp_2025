@@ -316,6 +316,44 @@ season_2026_games <- if (!is.null(schedules_2026)) {
     arrange(team, week)
 } else NULL
 
+# Current head coach per team, derived from the most recent played game
+# across schedules_2025/schedules_2026's home_coach/away_coach columns.
+# Pulling from both (not just schedules_2025) means an offseason coaching
+# change surfaces automatically once real 2026 games are played, with no
+# code change needed next year. nflverse has no coordinator-level dataset,
+# so only the head coach can be derived automatically; other staff roles
+# are tracked manually in data/coaches.csv.
+coach_rows_from <- function(sched) {
+  if (is.null(sched)) return(NULL)
+  reg_sched <- sched |> filter(game_type == "REG", !is.na(home_score))
+  if (nrow(reg_sched) == 0) return(NULL)
+  home <- reg_sched |> transmute(team = home_team, season, week, coach = home_coach)
+  away <- reg_sched |> transmute(team = away_team, season, week, coach = away_coach)
+  bind_rows(home, away) |> filter(!is.na(coach))
+}
+
+team_coaches <- {
+  all_coach_rows <- bind_rows(
+    coach_rows_from(schedules_2025),
+    coach_rows_from(schedules_2026)
+  )
+  if (nrow(all_coach_rows) > 0) {
+    all_coach_rows |>
+      group_by(team) |>
+      slice_max(order_by = season * 100 + week, n = 1, with_ties = FALSE) |>
+      ungroup() |>
+      select(team, head_coach = coach)
+  } else NULL
+}
+
+# Coordinators & other staff (no nflverse source exists for these; maintained
+# by hand, same pattern as trades.csv/free_agents.csv).
+coaching_staff <- tryCatch(
+  read_csv("data/coaches.csv", show_col_types = FALSE) |>
+    mutate(team = clean_team_abbrs(team)),
+  error = function(e) NULL
+)
+
 message("Data loaded. Building league-wide summaries...")
 
 # ── League-wide summaries ─────────────────────────────────────────────────────
