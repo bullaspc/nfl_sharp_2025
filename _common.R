@@ -295,6 +295,30 @@ season_2025_games <- if (!is.null(schedules_2025)) {
     arrange(team, week)
 } else NULL
 
+# Current head coach per team, derived from schedules_2025's home_coach/
+# away_coach columns (each team's most recent played game). nflverse has no
+# coordinator-level dataset, so only the head coach can be derived
+# automatically; other staff roles are tracked manually in data/coaches.csv.
+team_coaches <- if (!is.null(schedules_2025)) {
+  reg_sched <- schedules_2025 |> filter(game_type == "REG", !is.na(home_score))
+  home <- reg_sched |> transmute(team = home_team, week, coach = home_coach)
+  away <- reg_sched |> transmute(team = away_team, week, coach = away_coach)
+  bind_rows(home, away) |>
+    filter(!is.na(coach)) |>
+    group_by(team) |>
+    slice_max(week, n = 1, with_ties = FALSE) |>
+    ungroup() |>
+    select(team, head_coach = coach)
+} else NULL
+
+# Coordinators & other staff (no nflverse source exists for these; maintained
+# by hand, same pattern as trades.csv/free_agents.csv).
+coaching_staff <- tryCatch(
+  read_csv("data/coaches.csv", show_col_types = FALSE) |>
+    mutate(team = clean_team_abbrs(team)),
+  error = function(e) NULL
+)
+
 # 2026 (next season) schedule with opening/current betting lines, for the
 # team-page "2026 Schedule" preview table. No results/EPA yet since these
 # games haven't been played.
